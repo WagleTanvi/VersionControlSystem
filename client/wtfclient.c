@@ -209,7 +209,7 @@ int read_configure_and_connect(){
         if (port != NULL && host != NULL){
             sockfd = create_socket(host, port);
         }
-        //free(fileData);
+        free(fileData);
         return sockfd;
 }
 
@@ -268,12 +268,14 @@ int main(int argc, char** argv) {
     }
     else if(argc == 3 && (strcmp(argv[1], "create")==0 || strcmp(argv[1], "checkout")==0)){
         sockfd = read_configure_and_connect();
+        
         /*Sending command to create project in server.*/
         int nlen = strlen(argv[2]);
         int clen = nlen+digits(nlen)+strlen(argv[1])+2;
         char* command = (char*)malloc(clen+1*sizeof(char)); 
         snprintf(command, clen+1, "%s:%d:%s", argv[1], nlen, argv[2]); 
         int n = write(sockfd, command, clen+1);
+        int ne = write(sockfd, "Done", 4);
         if(n < 0)
             printf("ERROR writing to socket.\n");
         else{
@@ -285,7 +287,6 @@ int main(int argc, char** argv) {
             printf("%s\n", buffer);
             parseBuffer_create(buffer);
         }
-        n = write(sockfd, "Done", 4);
         free(command);
     }
     else {
