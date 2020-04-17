@@ -24,6 +24,16 @@ int digits(int n) {
     }
     return count;
 }
+#include <openssl/sha.h>
+
+
+typedef struct ManifestRecord{
+    char* projectName;
+    char* version;
+    char* file;
+    unsigned char* hash;
+} ManifestRecord;
+typedef enum Boolean {true = 1, false = 0} Boolean; 
 
 /* Check if malloc data is null */
 void check_malloc_null(void* data){
@@ -84,6 +94,8 @@ void mkdir_recursive(const char *path){
     free(fullpath);
 }
 
+// SOCKET METHODS
+// ==================================================================
 /* delay function - DOESNT really WORK*/ 
 void delay(int number_of_seconds) 
 { 
@@ -97,9 +109,6 @@ void delay(int number_of_seconds)
     while (clock() < start_time + milli_seconds) 
         ; 
 } 
-
-//=========================== NETWORKING=============================
-
 /* Connect to Server*/
 int create_socket(char* host, char* port){
     int portno = atoi(port);
@@ -163,6 +172,7 @@ void write_configure(char* hostname, char* port){
     write(outputFile, "\n", 1);
     write(outputFile, port, strlen(port));
     close(outputFile);
+
 }
 
 /* Method to non-blocking read a file and returns a string with contents of file */
@@ -177,7 +187,7 @@ char* read_file(char* file){
     if(stat(file, &stats) == 0){
         int fileSize = stats.st_size; 
         if(fileSize == 0){
-            printf("Warning: file is empty.\n");
+            printf("Warning: %s file is empty.\n", file);
         }
         char* buffer = (char*)malloc(fileSize+1 * sizeof(char));
         check_malloc_null(buffer);
@@ -260,6 +270,281 @@ void parseBuffer_create(char* buffer){
     free(tok);
 }
 
+/*Sending command to create project in server.*/
+int write_to_server(int sockfd, char* argv1, char* argv2){
+    int nlen = strlen(argv2);
+    int clen = nlen+digits(nlen)+strlen(argv1)+2;
+    char* command = (char*)malloc(clen+1*sizeof(char)); 
+    snprintf(command, clen+1, "%s:%d:%s", argv1, nlen, argv2);
+    int n = write(sockfd, command, strlen(command));
+    free(command);
+    return n;
+}
+
+char* read_from_server(int sockfd){
+    /*Read the project name sent from the server.*/
+    char* buffer = (char*)malloc(256*sizeof(char));
+    bzero(buffer,256);
+    int n = read(sockfd,buffer,255);
+    if(n < 0) printf("ERROR reading to socket.\n");
+    printf("%s\n", buffer);
+    return buffer;
+}
+
+/* Returns true if file exists in project */
+Boolean fileExists(char* fileName){
+    DIR *dir = opendir(fileName);
+    if (dir != NULL){
+        printf("Fatal Error: %s Not a file or file path\n", fileName);
+        closedir(dir);
+        return false;
+    }
+    closedir(dir);
+    int fd = open(fileName, O_RDONLY);
+    if(fd == -1){
+        //printf("Fatal Error: %s named %s\n", strerror(errno), file);
+        //close(fd);
+        printf("Fatal Error: %s does not exist\n", fileName);
+        return false;
+    }
+    close(fd); 
+    return true;
+}
+/* Returns true if project is in folder */
+Boolean searchForProject(char* projectName){
+    DIR *dir = opendir(projectName);
+    if (dir == NULL){
+        printf("Fatal Error: Project %s does not exist\n", projectName);
+        return false;
+    }
+    closedir(dir);
+    return true;
+}
+/* Returns a hex formatted hash */
+unsigned char* getHash(char* data){;
+    unsigned char digest[16];
+    SHA256_CTX context;
+    SHA256_Init(&context);
+    SHA256_Update(&context, data, strlen(data));
+    SHA256_Final(digest, &context);
+    char* hexHash = (char*) malloc(sizeof(char)*16);
+    check_malloc_null(hexHash);
+    sprintf(hexHash, "%02x", digest);
+    printf("Hash: %s\n", hexHash);
+    return hexHash;
+}
+/* Returns number of lines in file */
+int number_of_lines(char* fileData){
+    int count = 0;
+    int pos = 0;
+    while (pos < strlen(fileData)){
+        if (fileData[pos] == '\n'){
+            count++;
+        }
+        pos++;
+    }
+    return count;
+}
+/* Parses one line of the Manifest and addes to stuct */
+void add_to_struct(char* line, ManifestRecord** manifest, int recordCount){
+    int start = 0;
+    int pos = 0;
+    int count = 0;
+    ManifestRecord* record = (ManifestRecord*) malloc(sizeof(ManifestRecord));
+    while (pos < strlen(line)){
+        if (line[pos] == ' ' || line[pos] == '\n'){
+            int len = pos - start;
+            char* temp = (char*) malloc(sizeof(char)*len+1);
+            temp[0] = '\0';
+            strncpy(temp, &line[start], len);
+            temp[len] = '\0';
+            switch (count){
+                case 0:
+                    record->version = temp;
+                    break;
+                case 1:
+                    record->projectName = temp;
+                    break;
+                case 2:
+                    record->file = temp;
+                    break;
+                case 3:
+                    record->hash = temp;
+                    count = -1;
+                    break;
+            }
+            //printf("Word: %s\n", temp);
+            count++;
+            //printf("%d %d %d\n", start, pos, len);
+            start = pos+1;
+        }
+        //printf("%c\n", line[pos]);
+        pos++;
+    }
+    manifest[recordCount] = record;
+}
+/* Returns an array of Manifest Records */
+ManifestRecord** create_manifest_struct(char* fileData){
+    int start = 0;
+    Boolean version = false;
+    int pos = 0;
+    int numberOfRecords = number_of_lines(fileData);
+    //printf("Number of Records %d\n",numberOfRecords);
+    ManifestRecord** manifest = (ManifestRecord**) malloc(sizeof(ManifestRecord*)*numberOfRecords);
+    int recordCount = 0;
+    while (pos < strlen(fileData)){
+        if (fileData[pos] == '\n'){
+            int len = pos - start;
+            char* temp = (char*) malloc(sizeof(char)*len+2);
+            temp[0] = '\0';
+            strncpy(temp, &fileData[start], len+1);
+            temp[len+1] = '\0';
+            if (version){ // if version number has already been seen
+                //printf("Line: %s\n", temp);
+                add_to_struct(temp, manifest, recordCount);
+                start = pos+1;
+                recordCount++;
+                free(temp);
+            }
+            else{
+                ManifestRecord* record = (ManifestRecord*) malloc(sizeof(ManifestRecord));
+                char* manifestCount = (char*) malloc(sizeof(char)*50);
+                sprintf(manifestCount, "%d", numberOfRecords);
+                record->projectName = NULL;
+                record->version = temp;
+                record->hash = manifestCount;
+                record->file = NULL;
+                manifest[recordCount] = record;
+                version = true;
+                start = pos+1;
+                recordCount++;
+            }
+        }
+        pos++;
+    }
+    return manifest;
+}
+
+/* Formats one manifest record */
+char* printManifest(ManifestRecord* record){
+    int len;
+
+    if (record->projectName == NULL){
+        return record->version;
+    }
+    else{
+        int len = strlen(record->version)+strlen(record->projectName)+strlen(record->file)+strlen(record->hash) + 1 + 3;
+        char* line = (char*) malloc(sizeof(char)*len);
+        line[0] = '\0';
+        strcat(line, record->version);
+        strcat(line, " ");
+        strcat(line,record->projectName );
+        strcat(line, " ");
+        strcat(line,record->file );
+        strcat(line, " ");
+        strcat(line,record->hash );
+        return line;
+
+    }
+}
+/* Returns size of manifest which is stored in the first position of the array hash value */
+int getManifestStructSize(ManifestRecord** manifest){
+    return atoi(manifest[0]->hash);
+}
+
+/* Look in the manifest for a particular file name formatted as project/filepath */
+Boolean search_manifest(ManifestRecord** manifest, char* targetFile){
+    int x = 1;
+    int size = getManifestStructSize(manifest);
+    while ( x < size){
+        if (strcmp(manifest[x]->file, targetFile) == 0){
+            return true;
+        }
+        x++;
+    }
+    return false;
+}
+
+/* Free Manifest Array */
+void freeManifest(ManifestRecord** manifest){
+    int size = getManifestStructSize(manifest);
+    free(manifest[0]->version);
+    free(manifest[0]->hash);
+    free(manifest[0]);
+    int x = 1;
+    while (x < size){
+        free(manifest[x]->projectName);
+        free(manifest[x]->version);
+        free(manifest[x]->file);
+        free(manifest[x]->hash);
+        free(manifest[x]);
+        x++;
+    }
+    free(manifest);
+}
+
+// ACTION METHODS
+// ============================================================================
+Boolean add_file_to_manifest(char* projectName, char* fileName, char* manifestPath){
+    int fd = open(manifestPath, O_WRONLY | O_APPEND);
+    if(fd == -1){
+        return false;
+    }
+    char* fileData = read_file(manifestPath);
+    ManifestRecord** manifest = create_manifest_struct(fileData);
+    if (search_manifest(manifest, fileName)){
+        printf("Fatal Error: File %s already exists in Manifest\n", fileName);
+    }
+    else{
+        write(fd, "1",1);
+        write(fd, " ", 1);
+        write(fd, projectName, strlen(projectName));
+        write(fd, " ", 1);
+        write(fd, fileName, strlen(fileName));
+        write(fd, " ", 1);
+        char* hashcode = getHash(fileData);
+        write(fd, hashcode, strlen(hashcode));
+        write(fd, "\n", 1);
+        free(hashcode);
+    }
+    freeManifest(manifest);
+    free(fileData);
+    close(fd);
+}
+Boolean remove_file_from_manifest(char* projectName, char* fileName, char* manifestPath){
+    char* fileData = read_file(manifestPath);
+    ManifestRecord** manifest = create_manifest_struct(fileData);
+    int x = 1;
+    int size = getManifestStructSize(manifest);
+    int fd = open(manifestPath, O_WRONLY | O_TRUNC);
+    if(fd == -1){
+        return false;
+    }
+    write(fd, manifest[0]->version, strlen(manifest[0]->version));
+    Boolean remove = false;
+    printf("%s\n", fileName);
+    while ( x < size){
+        if (strcmp(fileName, manifest[x]->file) != 0){
+            char* temp = printManifest(manifest[x]);
+            write(fd,temp, strlen(temp));
+            write(fd,"\n", 1);
+            //printf("%d", x);
+            free(temp);
+        }
+        else {
+            remove = true;
+        }
+        //printf("%s\n", manifest[x]->file);
+        x++;
+    }
+    if (!remove){
+        printf("Fatal Error: Manifest does not contain file\n");
+        return false;
+    }
+    freeManifest(manifest);
+    free(fileData);
+    close(fd);
+}
 // MAIN METHOD  ================================================================================
 int main(int argc, char** argv) {
     int sockfd;
@@ -268,31 +553,56 @@ int main(int argc, char** argv) {
     }
     else if(argc == 3 && (strcmp(argv[1], "create")==0 || strcmp(argv[1], "checkout")==0)){
         sockfd = read_configure_and_connect();
-        
-        /*Sending command to create project in server.*/
-        int nlen = strlen(argv[2]);
-        int clen = nlen+digits(nlen)+strlen(argv[1])+2;
-        char* command = (char*)malloc(clen+1*sizeof(char)); 
-        snprintf(command, clen+1, "%s:%d:%s", argv[1], nlen, argv[2]); 
-        int n = write(sockfd, command, clen+1);
-        int ne = write(sockfd, "Done", 4);
+        int n = write_to_server(sockfd, argv[1], argv[2]);
         if(n < 0)
             printf("ERROR writing to socket.\n");
         else{
-            /*Read the project name sent from the server.*/
-            char buffer[256];
-            bzero(buffer,256);
-            n = read(sockfd,buffer,255);
-            if(n < 0) printf("ERROR reading to socket.\n");
-            printf("%s\n", buffer);
+            char* buffer = read_from_server(sockfd);
             parseBuffer_create(buffer);
         }
-        free(command);
+    }
+    else if(argc == 3 && (strcmp(argv[1], "destroy")==0)){
+        sockfd = read_configure_and_connect();
+        int n = write_to_server(sockfd, argv[1], argv[2]);
+        if(n < 0)
+            printf("ERROR writing to socket.\n");
+        else{
+            char* buffer = read_from_server(sockfd);
+        }
+    }
+    else if (argc == 4 && (strcmp(argv[1],"add") == 0 || strcmp(argv[1],"remove") == 0)){
+        // combine project name and file path 
+        char* filePath = (char*) malloc(strlen(argv[2])+strlen(argv[3])+2);
+        check_malloc_null(filePath);
+        strcpy(filePath, argv[2]);
+        strcat(filePath, "/");
+        strcat(filePath, argv[3]);
+
+        if (searchForProject(argv[2])){
+            /* create manifest file path */
+            char* manifestFilePath = (char*) malloc(strlen(argv[2])+1+10);
+            strcpy(manifestFilePath, argv[2]);
+            strcat(manifestFilePath, "/.Manifest");
+
+            /* if manifest exists */
+            if (fileExists(manifestFilePath)){
+                if (fileExists(filePath) && (strcmp(argv[1],"add") == 0)) {
+                    add_file_to_manifest(argv[2], filePath, manifestFilePath);
+                }
+                else if (strcmp(argv[1],"remove") == 0){
+                    remove_file_from_manifest(argv[2], filePath, manifestFilePath);
+                }
+            }
+            free (manifestFilePath);
+        }
+        free(filePath);
     }
     else {
         printf("Fatal Error: Invalid Arguments\n");
-        //return 0;
     }
+    /*disconnect server at the end!*/
+    int n = write(sockfd, "Done", 4);
+    if(n < 0) printf("ERROR reading to socket.\n");
 
     // code to disconnect let server socket know client socket is disconnecting
     // printf("Client Disconnecting");

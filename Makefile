@@ -1,10 +1,28 @@
 all: WTF WTFServer
 
 WTF: ./client/wtfclient.c
-	gcc -g ./client/wtfclient.c -o WTF
+	gcc -g ./client/wtfclient.c -o ./client/WTF -lssl -lcrypto
 
 WTFServer: ./server/wtfserver.c
-	gcc -g -pthread ./server/wtfserver.c -o WTFServer
+	gcc -g -pthread ./server/wtfserver.c -o ./server/WTFServer
 	
 clean:
-	rm WTF WTFServer
+	rm ./client/WTF ./server/WTFServer
+
+gdbserver:
+	gdb ./server/WTFServer
+
+gdbclient:
+	gdb ./client/WTF
+
+runserver:
+	./server/WTFServer 8003
+
+create:
+	./client/WTF create project
+
+checkout:
+	./client/WTF checkout projectTwo
+
+destroy:
+	./client/WTF destroy projectTwo

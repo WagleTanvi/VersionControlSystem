@@ -91,8 +91,6 @@ void mkdir_recursive(const char *path){
     free(fullpath);
 }
 
-//===============================CHECKOUT======================
-
 char** inc_gcount(char** command){
     g_count++;
     if(g_count > max_arr_size){
@@ -135,7 +133,7 @@ char* make_command(char** commandArr){
     int current_len = 0;
     char* command = (char*)malloc(max_length*sizeof(char));
     int i = 0;
-    while(commandArr[i]!=NULL && i < max_arr_size){
+    while(i < g_count){
         current_len += (strlen(commandArr[i])+1);
         if(current_len > max_length){
             max_length += 500;
@@ -176,6 +174,78 @@ char* getFileContent(char* file){
     return NULL; 
 }
 
+int search_proj_exists(char* project_name){    
+    char path[4096];
+    struct dirent *d;
+    DIR *dir = opendir("./server");
+    if (dir == NULL){
+        return 0;
+    }    
+    while ((d = readdir(dir)) != NULL) {
+        if(strcmp(d->d_name, project_name)==0){
+            closedir(dir);
+            return 1;
+        }
+    }
+    closedir(dir);
+    return 0;
+}
+//===============================DESTROY======================
+int remove_directory(char* dirPath){
+    int r = -1;
+    char path[4096];
+    struct dirent *d;
+    DIR *dir = opendir(dirPath);
+    if (dir == NULL){
+        return -1;
+    }
+    r=0;
+    while (!r && (d = readdir(dir)) != NULL) {
+        int r2 = -1;
+        snprintf(path, 4096, "%s/%s", dirPath, d->d_name);        
+        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0) continue;
+        if (d->d_type == DT_DIR){
+            r2 = remove_directory(path);
+        }else{
+            r2 = unlink(path);
+        }
+        r = r2;
+    }
+    closedir(dir);
+    if (!r){
+       r = rmdir(dirPath);
+    }
+    return 0;  
+}
+
+void destroyProject(char* buffer, int clientSoc){
+    /*parse through the buffer*/
+    int bcount = 0;
+    char* cmd = strtok(buffer, ":"); //"create"
+    bcount += strlen(cmd)+1;
+    char* plens = strtok(NULL, ":"); // "12"
+    bcount += strlen(plens)+1;
+    int pleni = atoi(plens); //12
+    char* project_name = getSubstring(bcount, buffer, pleni);
+    int foundProj = search_proj_exists(project_name);
+    if(foundProj==0){
+        free(project_name);
+        int n = write(clientSoc, "ERROR the project does not exist on server.\n", 40);
+        if(n < 0) printf("ERROR writing to the client.\n");
+        return;
+    }
+    char* pname_server = appendStr("server/", project_name);
+    int r = remove_directory(pname_server);
+    if(r<0) printf("ERROR traversing directory.\n");
+    else {
+        free(project_name);
+        int n = write(clientSoc, "Successfully destroyed project.\n", 33);
+        if(n < 0) printf("ERROR writing to the client.\n");
+        return;
+    }
+}
+
+//===============================CHECKOUT======================
 char** checkoutProject(char** command, char* dirPath, int clientSoc){
     /*traverse the directory*/
     char path[4096];
@@ -214,22 +284,7 @@ char** checkoutProject(char** command, char* dirPath, int clientSoc){
     return command;
 }
 
-int search_proj_exists(char* project_name){    
-    char path[4096];
-    struct dirent *d;
-    DIR *dir = opendir("./server");
-    if (dir == NULL){
-        return 0;
-    }    
-    while ((d = readdir(dir)) != NULL) {
-        if(strcmp(d->d_name, project_name)==0){
-            closedir(dir);
-            return 1;
-        }
-    }
-    closedir(dir);
-    return 0;
-}
+
 
 //=============================CREATE===================================
 /*Create project folder.*/
@@ -298,6 +353,9 @@ void parseRead(char* buffer, int clientSoc){
         char* command = getCommand(buffer);
         if(strcmp(command, "create")==0 || strcmp(command, "checkout")==0){
             createProject(buffer, clientSoc);
+        }
+        else if(strcmp(command, "destroy")==0){
+            destroyProject(buffer, clientSoc);
         }
         else {
             printf("Have not implemented this command yet!\n");
