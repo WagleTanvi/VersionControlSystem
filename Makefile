@@ -1,10 +1,10 @@
 all: WTF WTFServer
 
-WTF: wtfclient.c
-	gcc -g wtfclient.c -o WTF
+WTF: ./client/wtfclient.c
+	gcc -g ./client/wtfclient.c -o ./client/WTF -lssl -lcrypto
 
-WTFServer: wtfserver.c
-	gcc -g -pthread wtfserver.c -o WTFServer
+WTFServer: server/wtfserver.c
+	gcc -g -pthread ./server/wtfserver.c -o ./server/WTFServer
 	
 clean:
-	rm WTF WTFServer
+	rm ./client/WTF ./server/WTFServer
