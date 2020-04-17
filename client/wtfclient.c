@@ -158,11 +158,9 @@ int create_socket(char* host, char* port){
     
     return sockfd;
 }
-
-//================================CONFIGURE=============================
 /* Create Configure File */
 void write_configure(char* hostname, char* port){
-    int outputFile = open("./client/.configure", O_WRONLY | O_CREAT | O_TRUNC, 00600); // creates a file if it does not already exist
+    int outputFile = open("./.configure", O_WRONLY | O_CREAT | O_TRUNC, 00600); // creates a file if it does not already exist
     if(outputFile == -1){
         printf("Fatal Error: %s\n", strerror(errno));
         close(outputFile);
@@ -209,7 +207,7 @@ char* read_file(char* file){
 /* Method to read configure file (if exists) and calls create socket to connect to server*/
 int read_configure_and_connect(){
         int sockfd;
-        char* fileData = read_file("./client/.configure");
+        char* fileData = read_file("./.configure");
         if (fileData == NULL){
             printf("Fatal Error: Configure File not found.\n");
             return;
