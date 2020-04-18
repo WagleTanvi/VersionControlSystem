@@ -190,6 +190,61 @@ int search_proj_exists(char* project_name){
     closedir(dir);
     return 0;
 }
+
+//===============================GET MANIFEST======================
+int send_manifest(char* project_name, int clientSoc){    
+    char path[4096];
+    struct dirent *d;
+    DIR *dir = opendir(project_name);
+    if (dir == NULL){
+        return -1;
+    }
+    while ((d = readdir(dir)) != NULL) {
+        snprintf(path, 4096, "%s/%s", dirPath, d->d_name);        
+        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0) continue;
+        if (d->d_type == DT_DIR){
+            int result = send_manifest(path);
+        }else{
+            if(strcmp(d->d_name, "./Manifest")==0){
+                //format the protocol to send to the client
+                char* manifest_data = getFileContent(path);
+                int n = write(clientSoc, manifest_data, strlen(manifest_data));
+                if(n < 0){
+                    printf("ERROR writing to client.\n").
+                    return -1;
+                }
+                else return 0;
+            }
+        }
+    }
+    closedir(dir);
+    return -2;
+}
+
+void fetchServerManifest(char* buffer, int clientSoc){
+    /*parse through the buffer*/
+    int bcount = 0;
+    char* cmd = strtok(buffer, ":");
+    bcount += strlen(cmd)+1;
+    char* plens = strtok(NULL, ":");
+    bcount += strlen(plens)+1;
+    int pleni = atoi(plens);
+    char* project_name = getSubstring(bcount, buffer, pleni);
+    int foundProj = search_proj_exists(project_name);
+    if(foundProj==0){
+        free(project_name);
+        int n = write(clientSoc, "ERROR the project does not exist on server.\n", 40);
+        if(n < 0) printf("ERROR writing to the client.\n");
+        return;
+    }
+    int s = send_manifest(project_name);
+    if(s == -1){
+        printf("ERROR sending Manifest to client./\n");
+    } else if(s == -2){
+        printf("ERROR cannot find Manifest file./\n");
+    }
+
+}
 //===============================DESTROY======================
 int remove_directory(char* dirPath){
     int r = -1;
@@ -284,8 +339,6 @@ char** checkoutProject(char** command, char* dirPath, int clientSoc){
     return command;
 }
 
-
-
 //=============================CREATE===================================
 /*Create project folder.*/
 void createProject(char* buffer, int clientSoc){
@@ -356,6 +409,9 @@ void parseRead(char* buffer, int clientSoc){
         }
         else if(strcmp(command, "destroy")==0){
             destroyProject(buffer, clientSoc);
+        }
+        else if(strcmp(command, "commit")==0){
+            fetchServerManifest(buffer, clientSoc);
         }
         else {
             printf("Have not implemented this command yet!\n");

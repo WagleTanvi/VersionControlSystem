@@ -12,7 +12,16 @@
 #include <netdb.h>
 #include <time.h>
 #include <libgen.h>
+#include <openssl/sha.h>
 
+typedef struct ManifestRecord{
+    char* projectName;
+    char* version;
+    char* file;
+    unsigned char* hash;
+} ManifestRecord;
+
+typedef enum Boolean {true = 1, false = 0} Boolean;
 
 //====================HELPER METHODS================================
 /*Count digits in a number*/
@@ -24,16 +33,6 @@ int digits(int n) {
     }
     return count;
 }
-#include <openssl/sha.h>
-
-
-typedef struct ManifestRecord{
-    char* projectName;
-    char* version;
-    char* file;
-    unsigned char* hash;
-} ManifestRecord;
-typedef enum Boolean {true = 1, false = 0} Boolean; 
 
 /* Check if malloc data is null */
 void check_malloc_null(void* data){
@@ -69,7 +68,6 @@ char* substr(char *src, int m, int n){
 	return dest - len;
 }
 
-
 int getUnknownLen(int bcount, char* buffer){
     int count = 0;
     while(buffer[bcount]!=':'){
@@ -94,8 +92,58 @@ void mkdir_recursive(const char *path){
     free(fullpath);
 }
 
-// SOCKET METHODS
-// ==================================================================
+/*Sending command to create project in server.*/
+int write_to_server(int sockfd, char* argv1, char* argv2){
+    int nlen = strlen(argv2);
+    int clen = nlen+digits(nlen)+strlen(argv1)+2;
+    char* command = (char*)malloc(clen+1*sizeof(char)); 
+    snprintf(command, clen+1, "%s:%d:%s", argv1, nlen, argv2);
+    int n = write(sockfd, command, strlen(command));
+    free(command);
+    return n;
+}
+
+char* read_from_server(int sockfd){
+    /*Read the project name sent from the server.*/
+    char* buffer = (char*)malloc(256*sizeof(char));
+    bzero(buffer,256);
+    int n = read(sockfd,buffer,255);
+    if(n < 0) printf("ERROR reading to socket.\n");
+    printf("%s\n", buffer);
+    return buffer;
+}
+
+/* Returns true if file exists in project */
+Boolean fileExists(char* fileName){
+    DIR *dir = opendir(fileName);
+    if (dir != NULL){
+        printf("Fatal Error: %s Not a file or file path\n", fileName);
+        closedir(dir);
+        return false;
+    }
+    closedir(dir);
+    int fd = open(fileName, O_RDONLY);
+    if(fd == -1){
+        //printf("Fatal Error: %s named %s\n", strerror(errno), file);
+        //close(fd);
+        printf("Fatal Error: %s does not exist\n", fileName);
+        return false;
+    }
+    close(fd); 
+    return true;
+}
+/* Returns true if project is in folder */
+Boolean searchForProject(char* projectName){
+    DIR *dir = opendir(projectName);
+    if (dir == NULL){
+        printf("Fatal Error: Project %s does not exist\n", projectName);
+        return false;
+    }
+    closedir(dir);
+    return true;
+}
+
+// SOCKET METHODS==================================================================
 /* delay function - DOESNT really WORK*/ 
 void delay(int number_of_seconds) 
 { 
@@ -268,56 +316,7 @@ void parseBuffer_create(char* buffer){
     free(tok);
 }
 
-/*Sending command to create project in server.*/
-int write_to_server(int sockfd, char* argv1, char* argv2){
-    int nlen = strlen(argv2);
-    int clen = nlen+digits(nlen)+strlen(argv1)+2;
-    char* command = (char*)malloc(clen+1*sizeof(char)); 
-    snprintf(command, clen+1, "%s:%d:%s", argv1, nlen, argv2);
-    int n = write(sockfd, command, strlen(command));
-    free(command);
-    return n;
-}
-
-char* read_from_server(int sockfd){
-    /*Read the project name sent from the server.*/
-    char* buffer = (char*)malloc(256*sizeof(char));
-    bzero(buffer,256);
-    int n = read(sockfd,buffer,255);
-    if(n < 0) printf("ERROR reading to socket.\n");
-    printf("%s\n", buffer);
-    return buffer;
-}
-
-/* Returns true if file exists in project */
-Boolean fileExists(char* fileName){
-    DIR *dir = opendir(fileName);
-    if (dir != NULL){
-        printf("Fatal Error: %s Not a file or file path\n", fileName);
-        closedir(dir);
-        return false;
-    }
-    closedir(dir);
-    int fd = open(fileName, O_RDONLY);
-    if(fd == -1){
-        //printf("Fatal Error: %s named %s\n", strerror(errno), file);
-        //close(fd);
-        printf("Fatal Error: %s does not exist\n", fileName);
-        return false;
-    }
-    close(fd); 
-    return true;
-}
-/* Returns true if project is in folder */
-Boolean searchForProject(char* projectName){
-    DIR *dir = opendir(projectName);
-    if (dir == NULL){
-        printf("Fatal Error: Project %s does not exist\n", projectName);
-        return false;
-    }
-    closedir(dir);
-    return true;
-}
+//========================HASHING===================================================
 /* Returns a hex formatted hash */
 unsigned char* getHash(char* data){;
     unsigned char digest[16];
@@ -331,6 +330,9 @@ unsigned char* getHash(char* data){;
     printf("Hash: %s\n", hexHash);
     return hexHash;
 }
+
+//========================MANIFEST===================================================
+
 /* Returns number of lines in file */
 int number_of_lines(char* fileData){
     int count = 0;
@@ -543,6 +545,49 @@ Boolean remove_file_from_manifest(char* projectName, char* fileName, char* manif
     free(fileData);
     close(fd);
 }
+
+//===================================COMMIT CHANGES===================================
+//12:elementsinthemanifestfilehowareyougoingtoreadallofit
+void write_commit_file(char* project_name, char* server_manifest_data){
+    //first check if the client has updates/conflicts
+    char* pname_client = append("./client", project_name);
+    char* update_file = strcat(pname_client, "/.Update");
+    if(file_empty_or_exists(update_file)){
+        free(pname_client);
+        printf("ERROR update file not empty. Please update project!.\n");
+        return;
+    }
+    free(pname_client);
+    char* pname_client = append("./client", project_name);
+    char* conflict_file = strcat(pname_client, "/.Conflict");
+    if(file_empty_or_exists(conflict_file)){
+        free(pname_client);
+        printf("ERROR conflicts still exist. Please resolve conflicts first.\n");
+        return;
+    }
+    //parse the manifestfile and make the struct
+    ManifestRecord** server_manifest = create_manifest_struct(server_manifest_data);
+    //get the client manifest file
+    char* client_manifest_data = getManifestData(project_name);
+    ManifestRecord** client_manifest = create_manifest_struct(client_manifest_data);
+    //compare manifset versions!
+    /*YOUR CODE HERE*/
+
+    //compute an array of live hashes
+    int* live_hash_arr = getLiveHashes(projectName);
+    //create path for commit
+    char* commit_path = ??;
+    int commit_file = open(commit_path, O_WRONLY | O_CREAT | O_TRUNC, 00600);
+    //go through each file in clinet manifest and compare manifests and write commit file
+    int i = 0;
+    while(client_manifest[i] != NULL){
+        i++;
+    }
+    //send the commit file to the server
+    char* commit_file_content = getFileContent(".Commit");
+
+}
+
 // MAIN METHOD  ================================================================================
 int main(int argc, char** argv) {
     int sockfd;
@@ -595,16 +640,22 @@ int main(int argc, char** argv) {
         }
         free(filePath);
     }
+    else if(argc == 3 && (strcmp(argv[1], "commit")==0)){
+        sockfd = read_configure_and_connect();
+        int n = write_to_server(sockfd, argv[1], argv[2]);
+        if(n < 0)
+            printf("ERROR writing to socket.\n");
+        else{
+            char* buffer = read_from_server(sockfd);
+            write_commit_file(buffer);
+        } 
+    }
     else {
         printf("Fatal Error: Invalid Arguments\n");
     }
     /*disconnect server at the end!*/
     int n = write(sockfd, "Done", 4);
     if(n < 0) printf("ERROR reading to socket.\n");
-
-    // code to disconnect let server socket know client socket is disconnecting
-    // printf("Client Disconnecting");
-    // write(sockfd, "Done",4);
 
     close(sockfd);
     return 0;
