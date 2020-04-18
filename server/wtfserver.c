@@ -365,6 +365,52 @@ void parseRead(char* buffer, int clientSoc){
 }
 
 //============================NETWORKING==================================
+/* blocking read */
+char* block_read(int fd, int targetBytes){
+    char* buffer = (char*) malloc(sizeof(char)*256);
+    bzero(buffer,256);
+    int status = 0;    
+    int readIn = 0;
+    do{
+        status = read(fd, buffer+readIn, targetBytes-readIn);
+        readIn += status;
+    } while (status > 0 && readIn < targetBytes);
+    if (readIn < 0) 
+        printf("ERROR reading from socket");
+    return buffer; 
+}
+
+/* blocking write */
+void block_write(int fd, char* data, int targetBytes){
+    int status = 0;    
+    int readIn = 0;
+    do{
+        status = write(fd, data+readIn, targetBytes-readIn);
+        readIn += status;
+    } while (status > 0 && readIn < targetBytes);
+    if (readIn < 0) 
+        printf("ERROR writing to socket");
+}
+
+int read_len_message(int fd){
+    //printf("um");
+    char* buffer = (char*) malloc(sizeof(char)*50);
+    bzero(buffer,50);
+    int status = 0;    
+    int readIn = 0;
+    do{
+        status = read(fd, buffer+readIn, 1);
+        readIn +=status;
+    } while (buffer[readIn-1] != ':' && status > 0);
+    char* num = (char*) malloc(sizeof(char)*strlen(buffer));
+    strncpy(num, buffer, strlen(buffer)-1);
+    num[strlen(buffer)] = '\0';
+    free(buffer);
+    //printf("%s", num);
+    int len = atoi(num);
+    free(num);
+    return len;
+}
 int set_up_connection(char* port){
     int sockfd, clientSoc;
     struct sockaddr_in serv_addr, cli_addr;
@@ -388,22 +434,21 @@ int set_up_connection(char* port){
           printf("ERROR on accept");
 
     /* Exchange Initial Messages */
-    char buffer[256];
-    bzero(buffer,256);
-    int n = read(clientSoc,buffer,255);
-    if (n < 0) printf("ERROR reading from socket");
+    int len = read_len_message(clientSoc);
+    //printf("%d", len);
+    char* buffer =  block_read(clientSoc, len);
     printf("%s\n",buffer);
-    n = write(clientSoc,"Client successfully connected to Server!",40);
-    if (n < 0) printf("ERROR writing to socket");
-
+    block_write(clientSoc,"43:Client successfully connected to Server!",43);
+    free(buffer);
     return clientSoc;
 }
 
-/* This method disconnects from server if necessary in the future*/
+/* This method disconnects from client if necessary in the future*/
 void disconnectServer(fd){
     write(fd, "Done",4);
     close(fd);
 }
+
 
 // ===================  MAIN METHOD  ================================================================================
 int main(int argc, char** argv) {
@@ -415,20 +460,20 @@ int main(int argc, char** argv) {
      }
     clientSock = set_up_connection(argv[1]);
      /* Code to infinite read from server and disconnect when client sends DONE*/
-     while (1){
-        char buffer[256];
-        bzero(buffer,256);
-        n = read(clientSock,buffer,255);
-        buffer[n] = '\0';
-        if (n < 0) printf("ERROR reading from socket");
-        if (strcmp(buffer, "Done") == 0){
-            printf("Client Disconnected");
-            break;
-        } else {
-            /*Parse through the buffer*/
-            parseRead(buffer, clientSock);
-        }
-     }
+    //  while (1){
+    //     char buffer[256];
+    //     bzero(buffer,256);
+    //     n = read(clientSock,buffer,255);
+    //     buffer[n] = '\0';
+    //     if (n < 0) printf("ERROR reading from socket");
+    //     if (strcmp(buffer, "Done") == 0){
+    //         printf("Client Disconnected");
+    //         break;
+    //     } else {
+    //         /*Parse through the buffer*/
+    //         parseRead(buffer, clientSock);
+    //     }
+    //  }
 
     close(clientSock);
 

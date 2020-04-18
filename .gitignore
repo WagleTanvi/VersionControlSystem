@@ -3,3 +3,4 @@ WTFServer
 a.out
 .configure
 client/t
+server/t
