@@ -251,6 +251,51 @@ void delay(int number_of_seconds)
         ; 
 } 
 
+/* blocking read */
+char* block_read(int fd, int targetBytes){
+    char* buffer = (char*) malloc(sizeof(char)*256);
+    bzero(buffer,256);
+    int status = 0;    
+    int readIn = 0;
+    do{
+        status = read(fd, buffer+readIn, targetBytes-readIn);
+        readIn += status;
+    } while (status > 0 && readIn < targetBytes);
+    if (readIn < 0) 
+        printf("ERROR reading from socket");
+    return buffer; 
+}
+
+/* blocking write */
+void block_write(int fd, char* data, int targetBytes){
+    int status = 0;    
+    int readIn = 0;
+    do{
+        status = write(fd, data+readIn, targetBytes-readIn);
+        readIn += status;
+    } while (status > 0 && readIn < targetBytes);
+    if (readIn < 0) 
+        printf("ERROR writing to socket");
+}
+int read_len_message(int fd){
+    //printf("um");
+    char* buffer = (char*) malloc(sizeof(char)*50);
+    bzero(buffer,50);
+    int status = 0;    
+    int readIn = 0;
+    do{
+        status = read(fd, buffer+readIn, 1);
+        readIn +=status;
+    } while (buffer[readIn-1] != ':' && status > 0);
+    char* num = (char*) malloc(sizeof(char)*strlen(buffer));
+    strncpy(num, buffer, strlen(buffer)-1);
+    num[strlen(buffer)] = '\0';
+    free(buffer);
+    //printf("%s", num);
+    int len = atoi(num);
+    free(num);
+    return len;
+}
 /* Connect to Server*/
 int create_socket(char* host, char* port){
     int portno = atoi(port);
@@ -288,16 +333,11 @@ int create_socket(char* host, char* port){
     } while (status < 0);
 
     /* Exchange initial connection messages*/
-    int n = write(sockfd,"Incoming client connection connection successful",48);
-    if (n < 0) 
-         error("ERROR writing to socket");
-    char buffer[256];
-    bzero(buffer,256);
-    n = read(sockfd,buffer,255);
-    if (n < 0) 
-         error("ERROR reading from socket");
+    block_write(sockfd,"48:Incoming client connection connection successful",51);
+    int len = read_len_message(sockfd);
+    char* buffer = block_read(sockfd, len);
     printf("%s\n",buffer);
-    
+    free(buffer);
     return sockfd;
 }
 
@@ -309,9 +349,9 @@ void write_configure(char* hostname, char* port){
         close(outputFile);
         exit(1);
     }
-    write(outputFile, hostname, strlen(hostname));
-    write(outputFile, "\n", 1);
-    write(outputFile, port, strlen(port));
+    block_write(outputFile, hostname, strlen(hostname));
+    block_write(outputFile, "\n", 1);
+    block_write(outputFile, port, strlen(port));
     close(outputFile);
 
 }
@@ -790,6 +830,11 @@ int main(int argc, char** argv) {
             char* buffer = read_from_server(sockfd);
             parseBuffer_create(buffer);
         }
+        /*disconnect server at the end!*/
+        block_write(sockfd, "Done", 4);
+        printf("Client Disconnecting");
+        close(sockfd);
+
     }
     else if(argc == 3 && (strcmp(argv[1], "destroy")==0)){
         sockfd = read_configure_and_connect();
@@ -799,6 +844,10 @@ int main(int argc, char** argv) {
         else{
             char* buffer = read_from_server(sockfd);
         }
+        /*disconnect server at the end!*/
+        block_write(sockfd, "Done", 4);
+        printf("Client Disconnecting");
+        close(sockfd);
     }
     else if (argc == 4 && (strcmp(argv[1],"add") == 0 || strcmp(argv[1],"remove") == 0)){
         // combine project name and file path 
@@ -844,6 +893,10 @@ int main(int argc, char** argv) {
     int n = write(sockfd, "Done", 4);
     if(n < 0) printf("ERROR reading to socket.\n");
 
+    sockfd = read_configure_and_connect();
+    // code to disconnect let server socket know client socket is disconnecting
+    // printf("Client Disconnecting");
+    // write(sockfd, "Done",4);
     close(sockfd);
     return 0;
 }
