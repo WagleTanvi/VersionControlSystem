@@ -16,7 +16,7 @@ gdbclient:
 	gdb ./client/WTF
 
 runserver:
-	./server/WTFServer 8003
+	./server/WTFServer 8004
 
 create:
 	./client/WTF create project
