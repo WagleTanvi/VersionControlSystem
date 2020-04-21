@@ -34,6 +34,14 @@ int digits(int n) {
     return count;
 }
 
+/*Returns a string converted number*/
+char* to_Str(int number){
+    char* num_str = (char*)malloc(digits(number)+1*sizeof(char));
+    snprintf(num_str, digits(number)+1, "%d", number);
+    num_str[digits(number)+1] = '\0';
+    return num_str;
+}
+
 /* Check if malloc data is null */
 void check_malloc_null(void* data){
     if ((char*) data == NULL ){
@@ -98,22 +106,25 @@ void mkdir_recursive(const char *path){
 
 /*Sending command to create project in server. Returns the fd*/
 int write_to_server(int sockfd, char* argv1, char* argv2){
-    int nlen = strlen(argv2);
-    int clen = nlen+digits(nlen)+strlen(argv1)+2;
+    int clen = strlen(argv2)+digits(strlen(argv2))+strlen(argv1)+2;
     char* command = (char*)malloc(clen+1*sizeof(char)); 
-    snprintf(command, clen+1, "%s:%d:%s", argv1, nlen, argv2);
-    int n = write(sockfd, command, strlen(command));
+    snprintf(command, clen+1, "%s:%d:%s", argv1, strlen(argv2), argv2);
+    char* new_command = (char*)malloc(strlen(command)+digits(strlen(command))+1 * sizeof(char));
+    new_command[0] = '\0';
+    strcat(new_command, to_Str((strlen(command))));
+    strcat(new_command, ":");
+    strcat(new_command, command);
+    int n = write(sockfd, new_command, strlen(new_command));
     free(command);
+    free(new_command);
     return n;
 }
 
 /*Returns the buffer from the server*/
 char* read_from_server(int sockfd){
     /*Read the project name sent from the server.*/
-    char* buffer = (char*)malloc(256*sizeof(char));
-    bzero(buffer,256);
-    int n = read(sockfd,buffer,255);
-    if(n < 0) printf("ERROR reading to socket.\n");
+    int len = read_len_message(sockfd);
+    char* buffer = block_read(sockfd, len);
     printf("%s\n", buffer);
     return buffer;
 }
@@ -149,16 +160,20 @@ Boolean searchForProject(char* projectName){
     return true;
 }
 
-/*Returns a string of the contents in a file*/
-char* getFileContent(char* file){
+/* Method to non-blocking read a file and returns a string with contents of file */
+char* read_file(char* file){
     int fd = open(file, O_RDONLY);
     if(fd == -1){
-        printf("ERROR opening file: %s\n", strerror(errno));
+        //printf("Fatal Error: %s named %s\n", strerror(errno), file);
+        //close(fd);
         return NULL;
     }
     struct stat stats;
     if(stat(file, &stats) == 0){
         int fileSize = stats.st_size; 
+        if(fileSize == 0){
+            printf("Warning: %s file is empty.\n", file);
+        }
         char* buffer = (char*)malloc(fileSize+1 * sizeof(char));
         check_malloc_null(buffer);
         int status = 0;    
@@ -173,7 +188,7 @@ char* getFileContent(char* file){
     }
     close(fd);
     printf("Warning: stat error. \n");
-    return NULL; 
+    return NULL;
 }
 
 // FREE METHODS==================================================================
@@ -292,7 +307,7 @@ int read_len_message(int fd){
     num[strlen(buffer)] = '\0';
     free(buffer);
     //printf("%s", num);
-    int len = atoi(num);
+    int len = atoi(num)-strlen(num);
     free(num);
     return len;
 }
@@ -338,6 +353,7 @@ int create_socket(char* host, char* port){
     char* buffer = block_read(sockfd, len);
     printf("%s\n",buffer);
     free(buffer);
+    
     return sockfd;
 }
 
@@ -356,52 +372,21 @@ void write_configure(char* hostname, char* port){
 
 }
 
-/* Method to non-blocking read a file and returns a string with contents of file */
-char* read_file(char* file){
-    int fd = open(file, O_RDONLY);
-    if(fd == -1){
-        //printf("Fatal Error: %s named %s\n", strerror(errno), file);
-        //close(fd);
-        return NULL;
-    }
-    struct stat stats;
-    if(stat(file, &stats) == 0){
-        int fileSize = stats.st_size; 
-        if(fileSize == 0){
-            printf("Warning: %s file is empty.\n", file);
-        }
-        char* buffer = (char*)malloc(fileSize+1 * sizeof(char));
-        check_malloc_null(buffer);
-        int status = 0;    
-        int readIn = 0;
-        do{
-            status = read(fd, buffer+readIn, fileSize);
-            readIn += status;
-        } while (status > 0 && readIn < fileSize);
-        buffer[fileSize] = '\0';
-        close(fd);
-        return buffer;
-    }
-    close(fd);
-    printf("Warning: stat error. \n");
-    return NULL;
-}
-
 /* Method to read configure file (if exists) and calls create socket to connect to server*/
 int read_configure_and_connect(){
-        int sockfd;
-        char* fileData = read_file("./client/.configure");
-        if (fileData == NULL){
-            printf("Fatal Error: Configure File not found.\n");
-            return;
-        }
-        char* host = strtok(fileData, "\n");
-        char* port = strtok(NULL, "\n"); 
-        if (port != NULL && host != NULL){
-            sockfd = create_socket(host, port);
-        }
-        free(fileData);
-        return sockfd;
+    int sockfd;
+    char* fileData = read_file("./client/.configure");
+    if (fileData == NULL){
+        printf("Fatal Error: Configure File not found.\n");
+        return;
+    }
+    char* host = strtok(fileData, "\n");
+    char* port = strtok(NULL, "\n"); 
+    if (port != NULL && host != NULL){
+        sockfd = create_socket(host, port);
+    }
+    free(fileData);
+    return sockfd;
 }
 
 //=================================CREATE==============================
@@ -411,6 +396,10 @@ void parseBuffer_create(char* buffer){
     int toklen = -1;
     char* tok = NULL;
     char* write_to_file = NULL;
+    int first_num_len = getUnknownLen(bcount, buffer);
+    tok = getSubstring(bcount, buffer, first_num_len);
+    bcount += strlen(tok);
+    bcount++;
     while(bcount < strlen(buffer)){
         if(toklen < 0){
             toklen = getUnknownLen(bcount, buffer);
@@ -453,21 +442,51 @@ void parseBuffer_create(char* buffer){
 
 //========================HASHING===================================================
 /* Returns a hex formatted hash */
-unsigned char* getHash(char* data){
-    unsigned char digest[16];
-    SHA256_CTX context;
-    SHA256_Init(&context);
-    SHA256_Update(&context, data, strlen(data));
-    SHA256_Final(digest, &context);
-    char* hexHash = (char*) malloc(sizeof(char)*16);
-    check_malloc_null(hexHash);
-    sprintf(hexHash, "%02x", digest);
-    printf("Hash: %s\n", hexHash);
-    return hexHash;
+// unsigned char* getHash(char* data){
+//     unsigned char digest[16];
+//     SHA256_CTX context;
+//     SHA256_Init(&context);
+//     SHA256_Update(&context, data, strlen(data));
+//     SHA256_Final(digest, &context);
+//     char* hexHash = (char*) malloc(sizeof(char)*16);
+//     check_malloc_null(hexHash);
+//     sprintf(hexHash, "%02x", digest);
+//     printf("Hash: %s\n", hexHash);
+//     return hexHash;
+// }
+unsigned char* getHash(char* s){
+	unsigned char *d = SHA256(s, strlen(s), 0);
+ 
+	int i;
+	for (i = 0; i < SHA256_DIGEST_LENGTH; i++)
+		printf("%02x", d[i]);
+	putchar('\n');
+    return d;
 }
 
-//========================MANIFEST===================================================
+/*Returns an array holding the live hashes for each file in the given manifest*/
+char** getLiveHashes(ManifestRecord** manifest, int size){
+    char** live_hash_arr = (char**)malloc(size*sizeof(char*));
+    int i = 1;
+    while(i < size){
+        char* file_path = (char*)malloc(10+strlen(manifest[i]->file) * sizeof(char));
+        char client[10] = "./client/\0";
+        int k = 0;
+        while(k < 10){
+            file_path[k] = client[k];
+            k++;
+        }
+        strcat(file_path, manifest[i]->file);
+        char* file_content = read_file(file_path);
+        char* live_hash =  getHash(file_content);
+        live_hash_arr[i] = live_hash;
+        i++;
+    }
+    return live_hash_arr;
+}
 
+// MANIFEST METHODS
+// ============================================================================
 /* Returns number of lines in file */
 int number_of_lines(char* fileData){
     int count = 0;
@@ -579,7 +598,6 @@ Boolean search_manifest(ManifestRecord** manifest, char* targetFile){
     }
     return false;
 }
-
 // ACTION METHODS
 // ============================================================================
 Boolean add_file_to_manifest(char* projectName, char* fileName, char* manifestPath){
@@ -645,26 +663,6 @@ Boolean remove_file_from_manifest(char* projectName, char* fileName, char* manif
 }
 
 //===================================COMMIT CHANGES===================================
-/*Returns an array holding the live hashes for each file in the given manifest*/
-char** getLiveHashes(ManifestRecord** manifest, int size){
-    char** live_hash_arr = (char**)malloc(size*sizeof(char*));
-    int i = 1;
-    while(i < size){
-        char* file_path = (char*)malloc(10+strlen(manifest[i]->file) * sizeof(char));
-        char client[10] = "./client/\0";
-        int k = 0;
-        while(k < 10){
-            file_path[k] = client[k];
-            k++;
-        }
-        strcat(file_path, manifest[i]->file);
-        char* file_content = getFileContent(file_path);
-        char* live_hash =  getHash(file_content);
-        live_hash_arr[i] = live_hash;
-        i++;
-    }
-    return live_hash_arr;
-}
 
 char* append_client(int size){
     char* pclient = (char*)malloc(size * sizeof(char));
@@ -677,13 +675,13 @@ char* append_client(int size){
 }
 
 /*Sends the commit file to the server.*/
-void write_commit_file(char* project_name, char* server_manifest_data){
+void write_commit_file(int sockfd, char* project_name, char* server_manifest_data){
     //first check if the client has updates to be made
     char* pclient = append_client(10+strlen(project_name)+strlen("./Update"));
     strcat(pclient, project_name);
     strcat(pclient, "/.Update");
     if(fileExists(pclient)==true){
-        if(strcmp(getFileContent(pclient),"")!=0){
+        if(strcmp(read_file(pclient),"")!=0){
             free(pclient);
             printf("ERROR update file not empty. Please update project!.\n");
             return;
@@ -707,7 +705,7 @@ void write_commit_file(char* project_name, char* server_manifest_data){
     strcat(pclient3, project_name);
     strcat(pclient3, "/.Manifest");
     ManifestRecord** server_manifest = create_manifest_struct(server_manifest_data);
-    char* client_manifest_data = getFileContent(pclient3);
+    char* client_manifest_data = read_file(pclient3);
     ManifestRecord** client_manifest = create_manifest_struct(client_manifest_data);
     int client_manifest_size = getManifestStructSize(client_manifest);
     int server_manifest_size = getManifestStructSize(server_manifest);
@@ -805,8 +803,24 @@ void write_commit_file(char* project_name, char* server_manifest_data){
     }
 
     /*Send the commit file to the server*/
-    char* commit_file_content = getFileContent(commit_path);
-    printf("%s\n", commit_file_content);
+    char* commit_file_content = read_file(commit_path);
+    char* length_of_commit = to_Str(strlen(commit_file_content));
+    char* send_commit_to_server = (char*)malloc(strlen("commit")+digits(project_name)+strlen(project_name)+digits(length_of_commit)+strlen(commit_file_content)+4 * sizeof(char));
+    send_commit_to_server[0] = '\0';
+    strcat(send_commit_to_server, "commit");
+    strcat(send_commit_to_server, ":");
+    strcat(send_commit_to_server, to_Str(strlen(project_name)));
+    strcat(send_commit_to_server, ":");
+    strcat(send_commit_to_server, project_name)
+    strcat(send_commit_to_server, ":");
+    strcat(send_commit_to_server, length_of_commit)
+    strcat(send_commit_to_server, ":");
+    strcat(send_commit_to_server, commit_file_content);
+    char* extended_commit_cmd = (char*)malloc(digits(strlen(send_commit_to_server)+strlen(send_commit_to_server)+1*sizeof(char)));
+    extended_commit_cmd[0] = '\0';
+    strcat(extended_commit_cmd, to_str(strlen(send_commit_to_server)+1));
+    strcat(extended_commit_cmd, ":");
+    block_write(sockfd, extended_commit_cmd, strlen(extended_commit_cmd));
 
     /*Finally free!*/
     free(commit_path);
@@ -878,26 +892,29 @@ int main(int argc, char** argv) {
     }
     else if(argc == 3 && (strcmp(argv[1], "commit")==0)){
         sockfd = read_configure_and_connect();
-        int n = write_to_server(sockfd, argv[1], argv[2]);
+        int n = write_to_server(sockfd, "manifest", argv[2]);
         if(n < 0)
             printf("ERROR writing to socket.\n");
         else{
             char* buffer = read_from_server(sockfd);
-            write_commit_file(argv[2], buffer);
+            write_commit_file(sockfd, argv[2], buffer);
         } 
+    }
+    else if(argc == 3 && (strcmp(argv[1], "push")==0)){
+    
     }
     else {
         printf("Fatal Error: Invalid Arguments\n");
     }
     /*disconnect server at the end!*/
-    int n = write(sockfd, "Done", 4);
-    if(n < 0) printf("ERROR reading to socket.\n");
+    // int n = write(sockfd, "Done", 4);
+    // if(n < 0) printf("ERROR reading to socket.\n");
 
-    sockfd = read_configure_and_connect();
+    // sockfd = read_configure_and_connect();
     // code to disconnect let server socket know client socket is disconnecting
     // printf("Client Disconnecting");
     // write(sockfd, "Done",4);
-    close(sockfd);
+    // close(sockfd);
     return 0;
 }
 
