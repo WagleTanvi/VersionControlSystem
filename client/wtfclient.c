@@ -14,7 +14,40 @@
 #include <libgen.h>
 #include <openssl/sha.h>
 
-//====================HELPER METHODS================================
+/*So.. idk if you like this formatting method but basically it goes
+
+helper
+free
+printing
+hashing
+records
+commit
+upgrade
+update
+add/remove
+create
+socket/networking
+main
+
+i kind of tried to follow the way of the asst.pdf
+
+*/
+
+typedef struct Record{
+    char* version; //for manifest it is the version number, for upgrade and push it is the command 'M','A', or 'D'
+    char* file; //file path (includes the project name)
+    unsigned char* hash;
+} Record;
+
+typedef enum Boolean{
+    true = 1,
+    false = 0
+} Boolean;
+
+//================== PROTOTYPES===========================================
+
+void block_write(int fd, char *data, int targetBytes);
+//==================== HELPER METHODS ================================
 /*Count digits in a number*/
 int digits(int n)
 {
@@ -27,18 +60,13 @@ int digits(int n)
     return count;
 }
 
-typedef struct ManifestRecord
-{
-    char *projectName;
-    char *version;
-    char *file;
-    unsigned char *hash;
-} ManifestRecord;
-typedef enum Boolean
-{
-    true = 1,
-    false = 0
-} Boolean;
+/*Returns a string converted number*/
+char* to_Str(int number){
+    char* num_str = (char*)malloc(digits(number)+1*sizeof(char));
+    snprintf(num_str, digits(number)+1, "%d", number);
+    num_str[digits(number)+1] = '\0';
+    return num_str;
+}
 
 /* Check if malloc data is null */
 void check_malloc_null(void *data)
@@ -51,8 +79,8 @@ void check_malloc_null(void *data)
     }
 }
 
-char *getSubstring(int bcount, char *buffer, int nlen)
-{
+/*Returns a substring*/
+char* getSubstring(int bcount, char* buffer, int nlen){
     int count = 0;
     char *substr = (char *)malloc(nlen + 1 * sizeof(char));
     while (count < nlen)
@@ -65,23 +93,22 @@ char *getSubstring(int bcount, char *buffer, int nlen)
     return substr;
 }
 
-char *substr(char *src, int m, int n)
-{
-    int len = n - m;
-    char *dest = (char *)malloc(sizeof(char) * (len + 1));
-    int i = m;
-    while (i < n && (*(src + i) != '\0'))
-    {
-        *dest = *(src + i);
-        dest++;
+/*Returns a substring (delete later)*/
+char* substr(char *src, int m, int n){
+	int len = n - m;
+	char *dest = (char*)malloc(sizeof(char) * (len + 1));
+	int i = m;
+    while(i < n && (*(src + i) != '\0')){
+		*dest = *(src + i);
+		dest++;
         i++;
     }
     *dest = '\0';
     return dest - len;
 }
 
-int getUnknownLen(int bcount, char *buffer)
-{
+/*Returns the length up to the colon*/
+int getUnknownLen(int bcount, char* buffer){
     int count = 0;
     while (buffer[bcount] != ':')
     {
@@ -91,8 +118,8 @@ int getUnknownLen(int bcount, char *buffer)
     return count;
 }
 
-void mkdir_recursive(const char *path)
-{
+/*Makes a directory with all the subdirectories etc.*/
+void mkdir_recursive(const char *path){
     char *subpath, *fullpath;
     fullpath = strdup(path);
     subpath = dirname(fullpath);
@@ -109,21 +136,695 @@ void mkdir_recursive(const char *path)
     free(fullpath);
 }
 
-// SOCKET METHODS
-// ==================================================================
-/* delay function - DOESNT really WORK*/
-void delay(int number_of_seconds)
-{
-    // Converting time into milli_seconds
-    int milli_seconds = 100000 * number_of_seconds;
-
-    // Storing start time
-    clock_t start_time = clock();
-
-    // looping till required time is not achieved
-    while (clock() < start_time + milli_seconds)
-        ;
+/* Returns true if file exists in project */
+Boolean fileExists(char* fileName){
+    DIR *dir = opendir(fileName);
+    if (dir != NULL){
+        printf("Fatal Error: %s Not a file or file path\n", fileName);
+        closedir(dir);
+        return false;
+    }
+    closedir(dir);
+    int fd = open(fileName, O_RDONLY);
+    if(fd == -1){
+        //printf("Fatal Error: %s named %s\n", strerror(errno), file);
+        //close(fd);
+        printf("Fatal Error: %s does not exist\n", fileName);
+        return false;
+    }
+    close(fd); 
+    return true;
 }
+
+/* Returns true if project is in folder */
+Boolean searchForProject(char* projectName){
+    DIR *dir = opendir(projectName);
+    if (dir == NULL){
+        printf("Fatal Error: Project %s does not exist\n", projectName);
+        return false;
+    }
+    closedir(dir);
+    return true;
+}
+
+/* Method to non-blocking read a file and returns a string with contents of file */
+char* read_file(char* file){
+    int fd = open(file, O_RDONLY);
+    if(fd == -1){
+        //printf("Fatal Error: %s named %s\n", strerror(errno), file);
+        //close(fd);
+        return NULL;
+    }
+    struct stat stats;
+    if(stat(file, &stats) == 0){
+        int fileSize = stats.st_size; 
+        if(fileSize == 0){
+            printf("Warning: %s file is empty.\n", file);
+        }
+        char* buffer = (char*)malloc(fileSize+1 * sizeof(char));
+        check_malloc_null(buffer);
+        int status = 0;    
+        int readIn = 0;
+        do{
+            status = read(fd, buffer+readIn, fileSize);
+            readIn += status;
+        } while (status > 0 && readIn < fileSize);
+        buffer[fileSize] = '\0';
+        close(fd);
+        return buffer;
+    }
+    close(fd);
+    printf("Warning: stat error. \n");
+    return NULL;
+}
+
+//================================= FREE METHODS==================================================================
+/*Free 2d String array*/
+void free_string_arr(char** arr, int size){
+    int i = 0;
+    while(i < size){
+        free(arr[i]);
+        i++;
+    }
+    free(arr);
+}
+
+/* Free Record Array */
+void freeRecord(Record** record_arr){
+    int size = getRecordStructSize(record_arr);
+    free(record_arr[0]->version);
+    free(record_arr[0]->hash);
+    free(record_arr[0]);
+    int x = 1;
+    while (x < size){
+        free(record_arr[x]->version);
+        free(record_arr[x]->file);
+        free(record_arr[x]->hash);
+        free(record_arr[x]);
+        x++;
+    }
+    free(record_arr);
+}
+
+//================================= PRINTING METHODS==================================================================
+/* Formats one record */
+char* printRecord(Record* record){
+    int len;
+    if (record == NULL){
+        return NULL;
+    }
+    else{
+        int len = strlen(record->version)+strlen(record->file)+strlen(record->hash) + 1 + 3;
+        char* line = (char*) malloc(sizeof(char)*len);
+        line[0] = '\0';
+        strcat(line, record->version);
+        strcat(line, " ");
+        strcat(line, " ");
+        strcat(line,record->file );
+        strcat(line, " ");
+        strcat(line,record->hash );
+        return line;
+    }
+}
+
+void print_2d_arr(char** arr, int size){
+    int i = 1;
+    while(i < size){
+        printf("%s\n", (arr[i]));
+        i++;
+    }
+}
+
+//========================HASHING===================================================
+unsigned char* getHash(char* s){
+	unsigned char *d = SHA256(s, strlen(s), 0);
+ 
+	int i;
+	for (i = 0; i < SHA256_DIGEST_LENGTH; i++)
+		printf("%02x", d[i]);
+	putchar('\n');
+    return d;
+}
+
+/*Returns an array holding the live hashes for each file in the given record*/
+char** getLiveHashes(Record** record_arr, int size){
+    char** live_hash_arr = (char**)malloc(size*sizeof(char*));
+    int i = 1;
+    while(i < size){
+        char* file_path = (char*)malloc(10+strlen(record_arr[i]->file) * sizeof(char));
+        char client[10] = "./client/\0";
+        int k = 0;
+        while(k < 10){
+            file_path[k] = client[k];
+            k++;
+        }
+        strcat(file_path, record_arr[i]->file);
+        char* file_content = read_file(file_path);
+        char* live_hash =  getHash(file_content);
+        live_hash_arr[i] = live_hash;
+        i++;
+    }
+    return live_hash_arr;
+}
+
+// =======================  RECORD METHODS =====================================================
+/* Returns number of lines in file */
+int number_of_lines(char *fileData)
+{
+    int count = 0;
+    int pos = 0;
+    while (pos < strlen(fileData))
+    {
+        if (fileData[pos] == '\n')
+        {
+            count++;
+        }
+        pos++;
+    }
+    return count;
+}
+
+/* Parses one line of the Record and addes to stuct */
+void add_to_struct(char* line, Record** record_arr, int recordCount){
+    int start = 0;
+    int pos = 0;
+    int count = 0;
+    Record* record = (Record*) malloc(sizeof(Record));
+    while (pos < strlen(line)){
+        if (line[pos] == ' ' || line[pos] == '\n'){
+            int len = pos - start;
+            char *temp = (char *)malloc(sizeof(char) * len + 1);
+            temp[0] = '\0';
+            strncpy(temp, &line[start], len);
+            temp[len] = '\0';
+            switch (count){
+                case 0:
+                    record->version = temp;
+                    break;
+                case 1:
+                    record->file = temp;
+                    break;
+                case 2:
+                    record->hash = temp;
+                    count = -1;
+                    break;
+            }
+            count++;
+            start = pos+1;
+        }
+        pos++;
+    }
+    record_arr[recordCount] = record;
+}
+
+/* Returns an array of records */
+Record** create_record_struct(char* fileData){
+    int start = 0;
+    Boolean version = false;
+    int pos = 0;
+    int numberOfRecords = number_of_lines(fileData);
+    Record** record_arr = (Record**) malloc(sizeof(Record*)*numberOfRecords);
+    int recordCount = 0;
+    while (pos < strlen(fileData))
+    {
+        if (fileData[pos] == '\n')
+        {
+            int len = pos - start;
+            char *temp = (char *)malloc(sizeof(char) * len + 2);
+            temp[0] = '\0';
+            strncpy(temp, &fileData[start], len+1);
+            temp[len+1] = '\0';
+            if (version){ // if version number has already been seen
+                add_to_struct(temp, record_arr, recordCount);
+                start = pos+1;
+                recordCount++;
+                free(temp);
+            }
+            else{
+                Record* record = (Record*) malloc(sizeof(Record));
+                char* rec_count = (char*) malloc(sizeof(char)*50);
+                sprintf(rec_count, "%d", numberOfRecords);
+                record->version = temp;
+                record->file = NULL;
+                record->hash = rec_count; //the hash stores the number of records!
+                record_arr[recordCount] = record;
+                version = true;
+                start = pos + 1;
+                recordCount++;
+            }
+        }
+        pos++;
+    }
+    return record_arr;
+}
+
+/* Returns size of record array which is stored in the first position of the array hash value */
+int getRecordStructSize(Record** record_arr){
+    return atoi(record_arr[0]->hash);
+}
+/* Look in the records for a particular file name formatted as project/filepath */
+Boolean search_Record(Record** record_arr, char* targetFile){
+    int x = 1;
+    int size = getRecordStructSize(record_arr);
+    while ( x < size){
+        if (strcmp(record_arr[x]->file, targetFile) == 0){
+            return true;
+        }
+        x++;
+    }
+    return false;
+}
+
+char* search_record_hash(Record** record_arr, char* targetFile){
+    int x = 1;
+    int size = getRecordStructSize(record_arr);
+    while ( x < size){
+        if (strcmp(record_arr[x]->file, targetFile) == 0){
+            return record_arr[x]->hash;
+        }
+        x++;
+    }
+    return NULL;
+}
+
+//=================================== COMMIT ===================================
+
+char* append_client(int size){
+    char* pclient = (char*)malloc(size * sizeof(char));
+    char client[10] = "./client/\0";
+    int k = 0;
+    while(k < 10){
+        pclient[k] = client[k];
+        k++;
+    }
+}
+
+/*Sends the commit file to the server.*/
+void write_commit_file(int sockfd, char* project_name, char* server_record_data){
+    //first check if the client has updates to be made
+    char* pclient = append_client(10+strlen(project_name)+strlen("./Update"));
+    strcat(pclient, project_name);
+    strcat(pclient, "/.Update");
+    if(fileExists(pclient)==true){
+        if(strcmp(read_file(pclient),"")!=0){
+            free(pclient);
+            printf("ERROR update file not empty. Please update project!.\n");
+            return;
+        }
+    }
+    // free(pclient);
+
+    /*check if there is a conflict file*/
+    char* pclient2 = append_client(10+strlen(project_name)+strlen("./Conflict"));
+    strcat(pclient2, project_name);
+    strcat(pclient2, "/.Conflict");
+    if(fileExists(pclient2)==true){
+        free(pclient2);
+        printf("ERROR conflicts still exist. Please resolve conflicts first.\n");
+        return;
+    }
+    // free(pclient2);
+
+    // /*get server and client records*/
+    char* pclient3 = append_client(10+strlen(project_name)+strlen("./Manifest"));
+    strcat(pclient3, project_name);
+    strcat(pclient3, "/.Manifest");
+    Record** server_manifest = create_record_struct(server_record_data);
+    char* client_manifest_data = read_file(pclient3);
+    Record** client_manifest = create_record_struct(client_manifest_data);
+    int client_manifest_size = getRecordStructSize(client_manifest);
+    int server_manifest_size = getRecordStructSize(server_manifest);
+    
+    /*print out the manifests*/
+    int x = 1;
+    while (x < client_manifest_size){
+        char* temp = printRecord(client_manifest[x]);
+        printf("%s\n", temp);
+        x++;
+    }
+    x = 1;
+    while (x < server_manifest_size){
+        char* temp = printRecord(server_manifest[x]);
+        printf("%s\n", temp);
+        x++;
+    }
+
+    /*compare manifset versions - throw warning if bad*/
+    if(strcmp(server_manifest[0]->version, client_manifest[0]->version )!=0 ){
+        printf("ERROR client needs to update manifest.\n");
+        free(client_manifest_data);
+        freeRecord(server_manifest);
+        freeRecord(client_manifest);
+        return;
+    }
+
+    /*compute an array of live hashes*/
+    char** live_hash_arr = getLiveHashes(client_manifest, client_manifest_size);
+
+    /*create path for commit*/
+    char* pclient4 = append_client(10+strlen(project_name));
+    strcat(pclient4, project_name);
+    int path_len = strlen("./Commit")+strlen(pclient4);
+    char* commit_path = (char*)malloc(path_len+1*sizeof(char));
+    snprintf(commit_path, path_len+1, "%s%s", pclient4, "/.Commit");
+    commit_path[path_len+1] = '\0'; 
+    int commit_fd = open(commit_path, O_WRONLY | O_CREAT | O_TRUNC, 00600);
+
+    /*go through each file in client manifest and compare manifests and write commit file*/
+    int i = 1;
+    while(i < client_manifest_size){
+        /*check to see if they modified the code*/
+        char* file_name = client_manifest[i]->file;
+        Boolean found_file = search_Record(server_manifest, file_name);
+        Boolean write_file = false;
+        if(found_file == true){
+            if(strcmp(live_hash_arr[i], client_manifest[i]->hash)!=0){
+                /*check that the client file is up to date*/
+                int server_file_version = atoi(server_manifest[i]->version);
+                int client_file_version = atoi(client_manifest[i]->version);
+                if(server_file_version < client_file_version){
+                    free(client_manifest_data);
+                    freeRecord(server_manifest);
+                    freeRecord(client_manifest);
+                    close(commit_fd);
+                    unlink(commit_path); //delete /Commit file
+                    printf("ERROR client needs to synch repository with server before committing.\n");
+                    return;
+                }
+
+                /*write that client modified the file*/
+                //char* file_version = increment_file_version(client_manifest[i]->version); //where is the file version being incremented (seems like the manifest)
+                write(commit_fd, "M", 1);
+                write_file = true;
+            }
+        }
+        else {
+            /*write that client added a file*/
+            write(commit_fd, "A", 1);          
+            write_file = true;
+        }
+        if(write_file == true){
+            write(commit_fd, " ", 1);
+            write(commit_fd, file_name, strlen(file_name));
+            write(commit_fd, " ", 1);
+            write(commit_fd, client_manifest[i]->hash, strlen(client_manifest[i]->hash));
+            write(commit_fd, "\n", 1);
+        }
+        i++;
+    }
+    i = 1;
+    while(i < server_manifest_size){
+        char* file_name = server_manifest[i]->file;
+        Boolean found_file = search_Record(client_manifest, file_name);
+        if(found_file == false){
+            /*write that client deleted a file*/
+            write(commit_fd, "D", 1);          
+            write(commit_fd, " ", 1);
+            write(commit_fd, file_name, strlen(file_name));
+            write(commit_fd, " ", 1);
+            write(commit_fd, client_manifest[i]->hash, strlen(client_manifest[i]->hash));
+        }
+        i++;
+    }
+
+    /*Send the commit file to the server*/
+    char* commit_file_content = read_file(commit_path);
+    char* length_of_commit = to_Str(strlen(commit_file_content));
+    char* send_commit_to_server = (char*)malloc(strlen("commit")+digits(strlen(project_name))+strlen(project_name)+digits(atoi(length_of_commit))+strlen(commit_file_content)+4 * sizeof(char));
+    send_commit_to_server[0] = '\0';
+    strcat(send_commit_to_server, "commit");
+    strcat(send_commit_to_server, ":");
+    strcat(send_commit_to_server, to_Str(strlen(project_name)));
+    strcat(send_commit_to_server, ":");
+    strcat(send_commit_to_server, project_name);
+    strcat(send_commit_to_server, ":");
+    strcat(send_commit_to_server, length_of_commit);
+    strcat(send_commit_to_server, ":");
+    strcat(send_commit_to_server, commit_file_content);
+    char* extended_commit_cmd = (char*)malloc(digits(strlen(send_commit_to_server)+strlen(send_commit_to_server)+1*sizeof(char)));
+    extended_commit_cmd[0] = '\0';
+    strcat(extended_commit_cmd, to_Str(strlen(send_commit_to_server)+1));
+    strcat(extended_commit_cmd, ":");
+    block_write(sockfd, extended_commit_cmd, strlen(extended_commit_cmd));
+
+    /*Finally free!*/
+    free(commit_path);
+    freeRecord(server_manifest);
+    freeRecord(client_manifest);
+    free_string_arr(live_hash_arr, client_manifest_size);
+}
+
+//=========================== UPGRADE METHODS==================================================================
+void upgrade(char *projectName)
+{
+    // check if there is  .Update file
+    // check if there is .Conflict file
+    // check if .update is empty
+    // proccess updates
+    // if it is delete then just remove file
+    // if its add or modify then fetch from server
+    // delete .update file
+}
+
+//=========================== UPDATE METHODS==================================================================
+
+void update(char *projectName)
+{
+    // create client manifest struct
+    char *manifestFilePath = (char *)malloc(strlen(projectName) + 1 + 10);
+    strcpy(manifestFilePath, projectName);
+    strcat(manifestFilePath, "/.Manifest");
+    char *fileData = read_file(manifestFilePath);
+    Record** manifestClient = create_record_struct(fileData);
+    free(manifestFilePath);
+
+    // send manifest command
+    // recieve manifest data
+    // create server manifest struct
+    char *SmanifestFilePath = (char *)malloc(strlen(projectName) + 1 + 16);
+    strcpy(SmanifestFilePath, projectName);
+    strcat(SmanifestFilePath, "/.ManifestServer");
+    fileData = read_file(SmanifestFilePath);
+    Record** manifestServer = create_record_struct(fileData);
+
+    /*check versions of both structs*/
+    // versions are the same
+    char *updateFilePath = (char *)malloc(strlen(projectName) + 1 + 8);
+    strcpy(updateFilePath, projectName);
+    strcat(updateFilePath, "/.Update");
+    int ufd = open(updateFilePath, O_WRONLY | O_CREAT | O_TRUNC, 00600);
+    if (ufd == -1)
+    {
+        printf("Fatal Error: Could not open Update file");
+    }
+    char *conflictFilePath = (char *)malloc(strlen(projectName) + 1 + 10);
+    strcpy(conflictFilePath, projectName);
+    strcat(conflictFilePath, "/.Conflict");
+    int cfd = open(conflictFilePath, O_WRONLY | O_CREAT | O_TRUNC, 00600);
+    if (cfd == -1)
+    {
+        printf("Fatal Error: Could not open Update file");
+    }
+    if (strcmp(manifestServer[0]->version, manifestClient[0]->version) == 0)
+    {
+        close(ufd);
+        close(cfd);
+        free(updateFilePath);
+        unlink(conflictFilePath);
+        free(conflictFilePath);
+        return;
+    }
+    int size = getRecordStructSize(manifestServer);
+    int x = 1;
+    // for each file in the server manifest return hash or NULL
+    while (x < size)
+    {
+        char *clientHash = search_record_hash(manifestClient, manifestServer[x]->file);
+        int len = 4 + strlen(manifestServer[x]->file) + strlen(manifestServer[x]->hash);
+        char *temp = (char *)malloc(sizeof(char *) * (len) + 1);
+        if (clientHash == NULL)
+        {
+            printf("'A %s\n", manifestServer[x]->file);
+            snprintf(temp, len + 1, "%s %s %s\n", "'A", manifestServer[x]->file, manifestServer[x]->hash);
+            block_write(ufd, temp, len);
+        }
+        else
+        {
+            char *currentFileData = read_file(manifestServer[x]->file);
+            char *currentHash = getHash(currentFileData);
+            if (strcmp(currentHash, clientHash) == 0 && strcmp(manifestServer[x]->hash, clientHash) != 0)
+            { // live hash and manifest client hash same
+                printf("'M %s\n", manifestServer[x]->file);
+                snprintf(temp, len + 1, "%s %s %s\n", "'M", manifestServer[x]->file, manifestServer[x]->hash);
+                block_write(ufd, temp, len);
+            }
+            else if (strcmp(currentHash, clientHash) != 0 && strcmp(manifestServer[x]->hash, clientHash) != 0)
+            {
+                printf("'C %s\n", manifestServer[x]->file);
+                snprintf(temp, len, "%s %s %s\n", "'C", manifestServer[x]->file, manifestServer[x]->hash);
+                block_write(cfd, temp, len);
+            }
+        }
+        free(temp);
+        x++;
+    }
+    size = getRecordStructSize(manifestClient);
+    x = 1;
+    while (x < size)
+    {
+        char *serverHash = search_record_hash(manifestServer, manifestClient[x]->file);
+        if (serverHash == NULL)
+        { // file from client is not in server.
+            int len = 4 + strlen(manifestClient[x]->file) + strlen(manifestClient[x]->hash);
+            char *temp = (char *)malloc(sizeof(char *) * (len) + 1);
+            printf("'D %s:\n", manifestClient[x]->file);
+            snprintf(temp, len + 1, "%s %s %s\n", "'D", manifestClient[x]->file, manifestClient[x]->hash);
+            block_write(ufd, temp, len);
+            free(temp);
+        }
+        x++;
+    }
+    close(ufd);
+    close(cfd);
+}
+
+//===================================== ADD/REMOVE METHODS ============================================================================
+Boolean add_file_to_record(char* projectName, char* fileName, char* recordPath){
+    int fd = open(recordPath, O_WRONLY | O_APPEND);
+    if(fd == -1){
+        return false;
+    }
+    char* fileData = read_file(recordPath);
+    Record** record_arr = create_record_struct(fileData);
+    if (search_Record(record_arr, fileName)){
+        printf("Fatal Error: File %s already exists in Record\n", fileName);
+    }
+    else
+    {
+        write(fd, "1", 1);
+        write(fd, " ", 1);
+        write(fd, projectName, strlen(projectName));
+        write(fd, " ", 1);
+        write(fd, fileName, strlen(fileName));
+        write(fd, " ", 1);
+        char *fileData = read_file(fileName);
+        char *hashcode = getHash(fileData);
+        write(fd, hashcode, strlen(hashcode));
+        write(fd, "\n", 1);
+        free(hashcode);
+        free(fileData);
+    }
+    freeRecord(record_arr);
+    free(fileData);
+    close(fd);
+}
+
+Boolean remove_file_from_record(char* projectName, char* fileName, char* recordPath){
+    char* fileData = read_file(recordPath);
+    Record** record_arr = create_record_struct(fileData);
+    int x = 1;
+    int size = getRecordStructSize(record_arr);
+    int fd = open(recordPath, O_WRONLY | O_TRUNC);
+    if(fd == -1){
+        return false;
+    }
+    write(fd, record_arr[0]->version, strlen(record_arr[0]->version));
+    Boolean remove = false;
+    printf("%s\n", fileName);
+    while ( x < size){
+        if (strcmp(fileName, record_arr[x]->file) != 0){
+            char* temp = printRecord(record_arr[x]);
+            write(fd,temp, strlen(temp));
+            write(fd,"\n", 1);
+            //printf("%d", x);
+            free(temp);
+        }
+        else
+        {
+            remove = true;
+        }
+        x++;
+    }
+    if (!remove){
+        printf("Fatal Error: record does not contain file\n");
+        return false;
+    }
+    freeRecord(record_arr);
+    free(fileData);
+    close(fd);
+}
+
+//=================================================== CREATE ===============================================================
+/*Creates the project in the client folder*/
+void parseBuffer_create(char* buffer){
+    int bcount = 0;
+    int toklen = -1;
+    char* tok = NULL;
+    char* write_to_file = NULL;
+    int first_num_len = getUnknownLen(bcount, buffer);
+    tok = getSubstring(bcount, buffer, first_num_len);
+    bcount += strlen(tok);
+    bcount++;
+    while(bcount < strlen(buffer)){
+        if(toklen < 0){
+            toklen = getUnknownLen(bcount, buffer);
+        }
+        tok = getSubstring(bcount, buffer, toklen);
+        toklen = -1;
+        if (isdigit(tok[0]))
+        { //token is a number
+            toklen = atoi(tok);
+        } else {
+            /*create project*/
+            if(tok[0] == 'P'){
+                char* projectName = substr(tok, 1, strlen(tok));
+                mkdir_recursive(projectName);
+                int ch = chmod("./client", 0775);
+                if (ch < 0)
+                    printf("ERROR setting perrmissions.\n");
+                ch = chmod(projectName, 0775);
+                if (ch < 0)
+                    printf("ERROR setting perrmissions: %s.\n", strerror(errno));
+            }
+            /*create file*/
+            else if(tok[0] == 'F'){
+                char* filePath = substr(tok, 1, strlen(tok));
+                write_to_file = filePath;
+                int n = open(filePath, O_WRONLY | O_CREAT | O_TRUNC, 00600);
+                if (n < 0)
+                    printf("ERROR making file.\n");
+            }
+            /*write datainto file */
+            else if(tok[0] == 'C'){
+                char* fileContent = substr(tok, 1, strlen(tok));
+                int fn = open(write_to_file, O_WRONLY | O_CREAT | O_TRUNC, 00600);
+                if (fn < 0)
+                    printf("ERROR could not open file to write to.\n");
+                int n = write(fn, fileContent, strlen(fileContent));
+                if (n < 0)
+                    printf("ERROR writing data.\n");
+            }
+        }
+        bcount += strlen(tok);
+        bcount++; //this is for the semicolon
+    }
+    free(tok);
+}
+
+//=========================== SOCKET/CONFIGURE METHODS==================================================================
+/* delay function - DOESNT really WORK*/ 
+void delay(int number_of_seconds) 
+{ 
+    // Converting time into milli_seconds 
+    int milli_seconds = 100000 * number_of_seconds; 
+  
+    // Storing start time 
+    clock_t start_time = clock(); 
+  
+    // looping till required time is not achieved 
+    while (clock() < start_time + milli_seconds) 
+        ; 
+} 
 
 /* blocking read */
 char *block_read(int fd, int targetBytes)
@@ -172,7 +873,7 @@ int read_len_message(int fd)
     num[strlen(buffer)] = '\0';
     free(buffer);
     //printf("%s", num);
-    int len = atoi(num);
+    int len = atoi(num)-strlen(num);
     free(num);
     return len;
 }
@@ -222,6 +923,7 @@ int create_socket(char *host, char *port)
     char *buffer = block_read(sockfd, len);
     printf("%s\n", buffer);
     free(buffer);
+    
     return sockfd;
 }
 
@@ -239,42 +941,6 @@ void write_configure(char *hostname, char *port)
     block_write(outputFile, "\n", 1);
     block_write(outputFile, port, strlen(port));
     close(outputFile);
-}
-
-/* Method to non-blocking read a file and returns a string with contents of file */
-char *read_file(char *file)
-{
-    int fd = open(file, O_RDONLY);
-    if (fd == -1)
-    {
-        //printf("Fatal Error: %s named %s\n", strerror(errno), file);
-        //close(fd);
-        return NULL;
-    }
-    struct stat stats;
-    if (stat(file, &stats) == 0)
-    {
-        int fileSize = stats.st_size;
-        if (fileSize == 0)
-        {
-            printf("Warning: %s file is empty.\n", file);
-        }
-        char *buffer = (char *)malloc(fileSize + 1 * sizeof(char));
-        check_malloc_null(buffer);
-        int status = 0;
-        int readIn = 0;
-        do
-        {
-            status = read(fd, buffer + readIn, fileSize);
-            readIn += status;
-        } while (status > 0 && readIn < fileSize);
-        buffer[fileSize] = '\0';
-        close(fd);
-        return buffer;
-    }
-    close(fd);
-    printf("Warning: stat error. \n");
-    return NULL;
 }
 
 /* Method to read configure file (if exists) and calls create socket to connect to server*/
@@ -297,507 +963,31 @@ int read_configure_and_connect()
     return sockfd;
 }
 
-//=================================CREATE==============================
-//create:12:Pfirstproject:22:F./firstproject/.Manifest:0:C
-void parseBuffer_create(char *buffer)
-{
-    int bcount = 0;
-    int toklen = -1;
-    char *tok = NULL;
-    char *write_to_file = NULL;
-    while (bcount < strlen(buffer))
-    {
-        if (toklen < 0)
-        {
-            toklen = getUnknownLen(bcount, buffer);
-        }
-        tok = getSubstring(bcount, buffer, toklen); // "12"
-        toklen = -1;
-        if (isdigit(tok[0]))
-        { //token is a number
-            toklen = atoi(tok);
-        }
-        else
-        {
-            //create project
-            if (tok[0] == 'P')
-            {
-                char *projectName = substr(tok, 1, strlen(tok));
-                mkdir_recursive(projectName);
-                int ch = chmod("./client", 0775);
-                if (ch < 0)
-                    printf("ERROR setting perrmissions.\n");
-                ch = chmod(projectName, 0775);
-                if (ch < 0)
-                    printf("ERROR setting perrmissions: %s.\n", strerror(errno));
-            }
-            //create file
-            else if (tok[0] == 'F')
-            {
-                char *filePath = substr(tok, 1, strlen(tok));
-                write_to_file = filePath;
-                int n = open(filePath, O_WRONLY | O_CREAT | O_TRUNC, 00600);
-                if (n < 0)
-                    printf("ERROR making file.\n");
-            }
-            //write data **need the previous file**
-            else if (tok[0] == 'C')
-            {
-                char *fileContent = substr(tok, 1, strlen(tok));
-                int fn = open(write_to_file, O_WRONLY | O_CREAT | O_TRUNC, 00600);
-                if (fn < 0)
-                    printf("ERROR could not open file to write to.\n");
-                int n = write(fn, fileContent, strlen(fileContent));
-                if (n < 0)
-                    printf("ERROR writing data.\n");
-            }
-        }
-        bcount += strlen(tok);
-        bcount++; //this is for the semicolon
-    }
-    free(tok);
-}
-
-/*Sending command to create project in server.*/
-int write_to_server(int sockfd, char *argv1, char *argv2)
-{
-    int nlen = strlen(argv2);
-    int clen = nlen + digits(nlen) + strlen(argv1) + 2;
-    char *command = (char *)malloc(clen + 1 * sizeof(char));
-    snprintf(command, clen + 1, "%s:%d:%s", argv1, nlen, argv2);
-    int n = write(sockfd, command, strlen(command));
+/*Sending command to create project in server. Returns the fd*/
+int write_to_server(int sockfd, char* argv1, char* argv2){
+    int clen = strlen(argv2)+digits(strlen(argv2))+strlen(argv1)+2;
+    char* command = (char*)malloc(clen+1*sizeof(char)); 
+    snprintf(command, clen+1, "%s:%d:%s", argv1, strlen(argv2), argv2);
+    char* new_command = (char*)malloc(strlen(command)+digits(strlen(command))+1 * sizeof(char));
+    new_command[0] = '\0';
+    strcat(new_command, to_Str((strlen(command))));
+    strcat(new_command, ":");
+    strcat(new_command, command);
+    int n = write(sockfd, new_command, strlen(new_command));
     free(command);
+    free(new_command);
     return n;
 }
 
-char *read_from_server(int sockfd)
-{
+/*Returns the buffer from the server*/
+char* read_from_server(int sockfd){
     /*Read the project name sent from the server.*/
-    char *buffer = (char *)malloc(256 * sizeof(char));
-    bzero(buffer, 256);
-    int n = read(sockfd, buffer, 255);
-    if (n < 0)
-        printf("ERROR reading to socket.\n");
+    int len = read_len_message(sockfd);
+    char* buffer = block_read(sockfd, len);
     printf("%s\n", buffer);
     return buffer;
 }
 
-/* Returns true if file exists in project */
-Boolean fileExists(char *fileName)
-{
-    DIR *dir = opendir(fileName);
-    if (dir != NULL)
-    {
-        printf("Fatal Error: %s Not a file or file path\n", fileName);
-        closedir(dir);
-        return false;
-    }
-    closedir(dir);
-    int fd = open(fileName, O_RDONLY);
-    if (fd == -1)
-    {
-        //printf("Fatal Error: %s named %s\n", strerror(errno), file);
-        //close(fd);
-        printf("Fatal Error: %s does not exist\n", fileName);
-        return false;
-    }
-    close(fd);
-    return true;
-}
-/* Returns true if project is in folder */
-Boolean searchForProject(char *projectName)
-{
-    DIR *dir = opendir(projectName);
-    if (dir == NULL)
-    {
-        printf("Fatal Error: Project %s does not exist\n", projectName);
-        return false;
-    }
-    closedir(dir);
-    return true;
-}
-/* Returns a hex formatted hash */
-unsigned char *getHash(char *data)
-{
-    //printf("%s", data);
-    unsigned char *digest = SHA256(data, strlen(data), 0);
-    unsigned char *hexHash = (char *)malloc(sizeof(char) * 65);
-    int i = 0;
-    for (i = 0; i < SHA256_DIGEST_LENGTH; i++)
-    {
-        sprintf(hexHash + (i * 2), "%02x", digest[i]);
-    }
-    //printf("%s\n", hexHash);
-    return hexHash;
-}
-/* Returns number of lines in file */
-int number_of_lines(char *fileData)
-{
-    int count = 0;
-    int pos = 0;
-    while (pos < strlen(fileData))
-    {
-        if (fileData[pos] == '\n')
-        {
-            count++;
-        }
-        pos++;
-    }
-    return count;
-}
-/* Parses one line of the Manifest and addes to stuct */
-void add_to_struct(char *line, ManifestRecord **manifest, int recordCount)
-{
-    int start = 0;
-    int pos = 0;
-    int count = 0;
-    ManifestRecord *record = (ManifestRecord *)malloc(sizeof(ManifestRecord));
-    while (pos < strlen(line))
-    {
-        if (line[pos] == ' ' || line[pos] == '\n')
-        {
-            int len = pos - start;
-            char *temp = (char *)malloc(sizeof(char) * len + 1);
-            temp[0] = '\0';
-            strncpy(temp, &line[start], len);
-            temp[len] = '\0';
-            switch (count)
-            {
-            case 0:
-                record->version = temp;
-                break;
-            case 1:
-                record->projectName = temp;
-                break;
-            case 2:
-                record->file = temp;
-                break;
-            case 3:
-                record->hash = temp;
-                count = -1;
-                break;
-            }
-            //printf("Word: %s\n", temp);
-            count++;
-            //printf("%d %d %d\n", start, pos, len);
-            start = pos + 1;
-        }
-        //printf("%c\n", line[pos]);
-        pos++;
-    }
-    manifest[recordCount] = record;
-}
-/* Returns an array of Manifest Records */
-ManifestRecord **create_manifest_struct(char *fileData)
-{
-    int start = 0;
-    Boolean version = false;
-    int pos = 0;
-    int numberOfRecords = number_of_lines(fileData);
-    //printf("Number of Records %d\n",numberOfRecords);
-    ManifestRecord **manifest = (ManifestRecord **)malloc(sizeof(ManifestRecord *) * numberOfRecords);
-    int recordCount = 0;
-    while (pos < strlen(fileData))
-    {
-        if (fileData[pos] == '\n')
-        {
-            int len = pos - start;
-            char *temp = (char *)malloc(sizeof(char) * len + 2);
-            temp[0] = '\0';
-            strncpy(temp, &fileData[start], len + 1);
-            temp[len + 1] = '\0';
-            if (version)
-            { // if version number has already been seen
-                //printf("Line: %s\n", temp);
-                add_to_struct(temp, manifest, recordCount);
-                start = pos + 1;
-                recordCount++;
-                free(temp);
-            }
-            else
-            {
-                ManifestRecord *record = (ManifestRecord *)malloc(sizeof(ManifestRecord));
-                char *manifestCount = (char *)malloc(sizeof(char) * 50);
-                sprintf(manifestCount, "%d", numberOfRecords);
-                record->projectName = NULL;
-                record->version = temp;
-                record->hash = manifestCount;
-                record->file = NULL;
-                manifest[recordCount] = record;
-                version = true;
-                start = pos + 1;
-                recordCount++;
-            }
-        }
-        pos++;
-    }
-    return manifest;
-}
-
-/* Formats one manifest record */
-char *printManifest(ManifestRecord *record)
-{
-    int len;
-
-    if (record->projectName == NULL)
-    {
-        return record->version;
-    }
-    else
-    {
-        int len = strlen(record->version) + strlen(record->projectName) + strlen(record->file) + strlen(record->hash) + 1 + 3;
-        char *line = (char *)malloc(sizeof(char) * len);
-        line[0] = '\0';
-        strcat(line, record->version);
-        strcat(line, " ");
-        strcat(line, record->projectName);
-        strcat(line, " ");
-        strcat(line, record->file);
-        strcat(line, " ");
-        strcat(line, record->hash);
-        return line;
-    }
-}
-/* Returns size of manifest which is stored in the first position of the array hash value */
-int getManifestStructSize(ManifestRecord **manifest)
-{
-    return atoi(manifest[0]->hash);
-}
-
-/* Look in the manifest for a particular file name formatted as project/filepath */
-Boolean search_manifest(ManifestRecord **manifest, char *targetFile)
-{
-    int x = 1;
-    int size = getManifestStructSize(manifest);
-    while (x < size)
-    {
-        if (strcmp(manifest[x]->file, targetFile) == 0)
-        {
-            return true;
-        }
-        x++;
-    }
-    return false;
-}
-
-/* Free Manifest Array */
-void freeManifest(ManifestRecord **manifest)
-{
-    int size = getManifestStructSize(manifest);
-    free(manifest[0]->version);
-    free(manifest[0]->hash);
-    free(manifest[0]);
-    int x = 1;
-    while (x < size)
-    {
-        free(manifest[x]->projectName);
-        free(manifest[x]->version);
-        free(manifest[x]->file);
-        free(manifest[x]->hash);
-        free(manifest[x]);
-        x++;
-    }
-    free(manifest);
-}
-
-char *search_manifest_hash(ManifestRecord **manifest, char *targetFile)
-{
-    int x = 1;
-    int size = getManifestStructSize(manifest);
-    while (x < size)
-    {
-        if (strcmp(manifest[x]->file, targetFile) == 0)
-        {
-            return manifest[x]->hash;
-        }
-        x++;
-    }
-    return NULL;
-}
-// ACTION METHODS
-// ============================================================================
-Boolean add_file_to_manifest(char *projectName, char *fileName, char *manifestPath)
-{
-    int fd = open(manifestPath, O_WRONLY | O_APPEND);
-    if (fd == -1)
-    {
-        return false;
-    }
-    char *manifestData = read_file(manifestPath);
-    ManifestRecord **manifest = create_manifest_struct(manifestData);
-    if (search_manifest(manifest, fileName))
-    {
-        printf("Fatal Error: File %s already exists in Manifest\n", fileName);
-    }
-    else
-    {
-        write(fd, "1", 1);
-        write(fd, " ", 1);
-        write(fd, projectName, strlen(projectName));
-        write(fd, " ", 1);
-        write(fd, fileName, strlen(fileName));
-        write(fd, " ", 1);
-        char *fileData = read_file(fileName);
-        char *hashcode = getHash(fileData);
-        write(fd, hashcode, strlen(hashcode));
-        write(fd, "\n", 1);
-        free(hashcode);
-        free(fileData);
-    }
-    freeManifest(manifest);
-    free(manifestData);
-    close(fd);
-}
-Boolean remove_file_from_manifest(char *projectName, char *fileName, char *manifestPath)
-{
-    char *fileData = read_file(manifestPath);
-    ManifestRecord **manifest = create_manifest_struct(fileData);
-    int x = 1;
-    int size = getManifestStructSize(manifest);
-    int fd = open(manifestPath, O_WRONLY | O_TRUNC);
-    if (fd == -1)
-    {
-        return false;
-    }
-    write(fd, manifest[0]->version, strlen(manifest[0]->version));
-    Boolean remove = false;
-    printf("%s\n", fileName);
-    while (x < size)
-    {
-        if (strcmp(fileName, manifest[x]->file) != 0)
-        {
-            char *temp = printManifest(manifest[x]);
-            write(fd, temp, strlen(temp));
-            write(fd, "\n", 1);
-            //printf("%d", x);
-            free(temp);
-        }
-        else
-        {
-            remove = true;
-        }
-        //printf("%s\n", manifest[x]->file);
-        x++;
-    }
-    if (!remove)
-    {
-        printf("Fatal Error: Manifest does not contain file\n");
-        return false;
-    }
-    freeManifest(manifest);
-    free(fileData);
-    close(fd);
-}
-void update(char *projectName)
-{
-    // create client manifest struct
-    char *manifestFilePath = (char *)malloc(strlen(projectName) + 1 + 10);
-    strcpy(manifestFilePath, projectName);
-    strcat(manifestFilePath, "/.Manifest");
-    char *fileData = read_file(manifestFilePath);
-    ManifestRecord **manifestClient = create_manifest_struct(fileData);
-    free(manifestFilePath);
-
-    // send manifest command
-    // recieve manifest data
-    // create server manifest struct
-    char *SmanifestFilePath = (char *)malloc(strlen(projectName) + 1 + 16);
-    strcpy(SmanifestFilePath, projectName);
-    strcat(SmanifestFilePath, "/.ManifestServer");
-    fileData = read_file(SmanifestFilePath);
-    ManifestRecord **manifestServer = create_manifest_struct(fileData);
-
-    /*check versions of both structs*/
-    // versions are the same
-    char *updateFilePath = (char *)malloc(strlen(projectName) + 1 + 8);
-    strcpy(updateFilePath, projectName);
-    strcat(updateFilePath, "/.Update");
-    int ufd = open(updateFilePath, O_WRONLY | O_CREAT | O_TRUNC, 00600);
-    if (ufd == -1)
-    {
-        printf("Fatal Error: Could not open Update file");
-    }
-    char *conflictFilePath = (char *)malloc(strlen(projectName) + 1 + 10);
-    strcpy(conflictFilePath, projectName);
-    strcat(conflictFilePath, "/.Conflict");
-    int cfd = open(conflictFilePath, O_WRONLY | O_CREAT | O_TRUNC, 00600);
-    if (cfd == -1)
-    {
-        printf("Fatal Error: Could not open Update file");
-    }
-    if (strcmp(manifestServer[0]->version, manifestClient[0]->version) == 0)
-    {
-        close(ufd);
-        close(cfd);
-        free(updateFilePath);
-        unlink(conflictFilePath);
-        free(conflictFilePath);
-        return;
-    }
-    int size = getManifestStructSize(manifestServer);
-    int x = 1;
-    // for each file in the server manifest return hash or NULL
-    while (x < size)
-    {
-        char *clientHash = search_manifest_hash(manifestClient, manifestServer[x]->file);
-        int len = 4 + strlen(manifestServer[x]->file) + strlen(manifestServer[x]->hash);
-        char *temp = (char *)malloc(sizeof(char *) * (len) + 1);
-        if (clientHash == NULL)
-        {
-            printf("'A %s\n", manifestServer[x]->file);
-            snprintf(temp, len + 1, "%s %s %s\n", "'A", manifestServer[x]->file, manifestServer[x]->hash);
-            block_write(ufd, temp, len);
-        }
-        else
-        {
-            char *currentFileData = read_file(manifestServer[x]->file);
-            char *currentHash = getHash(currentFileData);
-            if (strcmp(currentHash, clientHash) == 0 && strcmp(manifestServer[x]->hash, clientHash) != 0)
-            { // live hash and manifest client hash same
-                printf("'M %s\n", manifestServer[x]->file);
-                snprintf(temp, len + 1, "%s %s %s\n", "'M", manifestServer[x]->file, manifestServer[x]->hash);
-                block_write(ufd, temp, len);
-            }
-            else if (strcmp(currentHash, clientHash) != 0 && strcmp(manifestServer[x]->hash, clientHash) != 0)
-            {
-                printf("'C %s\n", manifestServer[x]->file);
-                snprintf(temp, len, "%s %s %s\n", "'C", manifestServer[x]->file, manifestServer[x]->hash);
-                block_write(cfd, temp, len);
-            }
-        }
-        free(temp);
-        x++;
-    }
-    size = getManifestStructSize(manifestClient);
-    x = 1;
-    while (x < size)
-    {
-        char *serverHash = search_manifest_hash(manifestServer, manifestClient[x]->file);
-        if (serverHash == NULL)
-        { // file from client is not in server.
-            int len = 4 + strlen(manifestClient[x]->file) + strlen(manifestClient[x]->hash);
-            char *temp = (char *)malloc(sizeof(char *) * (len) + 1);
-            printf("'D %s:\n", manifestClient[x]->file);
-            snprintf(temp, len + 1, "%s %s %s\n", "'D", manifestClient[x]->file, manifestClient[x]->hash);
-            block_write(ufd, temp, len);
-            free(temp);
-        }
-        x++;
-    }
-    close(ufd);
-    close(cfd);
-}
-
-void upgrade(char *projectName)
-{
-    // check if there is  .Update file
-    // check if there is .Conflict file
-    // check if .update is empty
-    // proccess updates
-    // if it is delete then just remove file
-    // if its add or modify then fetch from server
-    // delete .update file
-}
 // MAIN METHOD  ================================================================================
 int main(int argc, char **argv)
 {
@@ -854,15 +1044,12 @@ int main(int argc, char **argv)
             strcat(manifestFilePath, "/.Manifest");
 
             /* if manifest exists */
-            if (fileExists(manifestFilePath))
-            {
-                if (fileExists(filePath) && (strcmp(argv[1], "add") == 0))
-                {
-                    add_file_to_manifest(argv[2], filePath, manifestFilePath);
+            if (fileExists(manifestFilePath)){
+                if (fileExists(filePath) && (strcmp(argv[1],"add") == 0)) {
+                    add_file_to_record(argv[2], filePath, manifestFilePath);
                 }
-                else if (strcmp(argv[1], "remove") == 0)
-                {
-                    remove_file_from_manifest(argv[2], filePath, manifestFilePath);
+                else if (strcmp(argv[1],"remove") == 0){
+                    remove_file_from_record(argv[2], filePath, manifestFilePath);
                 }
             }
             free(manifestFilePath);
@@ -874,14 +1061,33 @@ int main(int argc, char **argv)
         /* Need to handle update error : project does not exist on server */
         update(argv[2]);
     }
-    else
-    {
+    else if(argc == 3 && (strcmp(argv[1], "commit")==0)){
+        //pretty sure commit does not work right now? idk didn't test yet, im scared
+
+        // sockfd = read_configure_and_connect();
+        // int n = write_to_server(sockfd, "manifest", argv[2]);
+        // if(n < 0)
+        //     printf("ERROR writing to socket.\n");
+        // else{
+        //     char* buffer = read_from_server(sockfd);
+        //     write_commit_file(sockfd, argv[2], buffer);
+        // } 
+    }
+    else if(argc == 3 && (strcmp(argv[1], "push")==0)){
+    
+    }
+    else {
         printf("Fatal Error: Invalid Arguments\n");
     }
-    //sockfd = read_configure_and_connect();
+    /*disconnect server at the end!*/
+    // int n = write(sockfd, "Done", 4);
+    // if(n < 0) printf("ERROR reading to socket.\n");
+
+    // sockfd = read_configure_and_connect();
     // code to disconnect let server socket know client socket is disconnecting
     // printf("Client Disconnecting");
     // write(sockfd, "Done",4);
-    //close(sockfd);
+    // close(sockfd);
+
     return 0;
 }
