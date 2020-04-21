@@ -14,12 +14,11 @@
 #include <libgen.h>
 #include <openssl/sha.h>
 
-typedef struct ManifestRecord{
-    char* projectName;
-    char* version;
-    char* file;
+typedef struct Record{
+    char* action; //for manifest it is the version number, for upgrade and push it is the command 'M','A', or 'D'
+    char* file; //file path (includes the project name)
     unsigned char* hash;
-} ManifestRecord;
+} Record;
 
 typedef enum Boolean {true = 1, false = 0} Boolean;
 
@@ -203,26 +202,26 @@ void free_string_arr(char** arr, int size){
 }
 
 /* Free Manifest Array */
-void freeManifest(ManifestRecord** manifest){
-    int size = getManifestStructSize(manifest);
-    free(manifest[0]->version);
-    free(manifest[0]->hash);
-    free(manifest[0]);
+void freeRecord(Record** record_arr){
+    int size = getRecordStructSize(record_arr);
+    free(record_arr[0]->version);
+    free(record_arr[0]->hash);
+    free(record_arr[0]);
     int x = 1;
     while (x < size){
-        free(manifest[x]->projectName);
-        free(manifest[x]->version);
-        free(manifest[x]->file);
-        free(manifest[x]->hash);
-        free(manifest[x]);
+        free(record_arr[x]->projectName);
+        free(record_arr[x]->version);
+        free(record_arr[x]->file);
+        free(record_arr[x]->hash);
+        free(record_arr[x]);
         x++;
     }
-    free(manifest);
+    free(record_arr);
 }
 
 // PRINTING METHODS==================================================================
-/* Formats one manifest record */
-char* printManifest(ManifestRecord* record){
+/* Formats one record */
+char* printRecord(Record* record){
     int len;
 
     if (record->projectName == NULL){
@@ -464,19 +463,19 @@ unsigned char* getHash(char* s){
     return d;
 }
 
-/*Returns an array holding the live hashes for each file in the given manifest*/
-char** getLiveHashes(ManifestRecord** manifest, int size){
+/*Returns an array holding the live hashes for each file in the given record*/
+char** getLiveHashes(Record** record_arr, int size){
     char** live_hash_arr = (char**)malloc(size*sizeof(char*));
     int i = 1;
     while(i < size){
-        char* file_path = (char*)malloc(10+strlen(manifest[i]->file) * sizeof(char));
+        char* file_path = (char*)malloc(10+strlen(record_arr[i]->file) * sizeof(char));
         char client[10] = "./client/\0";
         int k = 0;
         while(k < 10){
             file_path[k] = client[k];
             k++;
         }
-        strcat(file_path, manifest[i]->file);
+        strcat(file_path, record_arr[i]->file);
         char* file_content = read_file(file_path);
         char* live_hash =  getHash(file_content);
         live_hash_arr[i] = live_hash;
@@ -485,8 +484,7 @@ char** getLiveHashes(ManifestRecord** manifest, int size){
     return live_hash_arr;
 }
 
-// MANIFEST METHODS
-// ============================================================================
+// =======================  RECORD METHODS =====================================================
 /* Returns number of lines in file */
 int number_of_lines(char* fileData){
     int count = 0;
@@ -500,12 +498,12 @@ int number_of_lines(char* fileData){
     return count;
 }
 
-/* Parses one line of the Manifest and addes to stuct */
-void add_to_struct(char* line, ManifestRecord** manifest, int recordCount){
+/* Parses one line of the Record and addes to stuct */
+void add_to_struct(char* line, Record** record_arr, int recordCount){
     int start = 0;
     int pos = 0;
     int count = 0;
-    ManifestRecord* record = (ManifestRecord*) malloc(sizeof(ManifestRecord));
+    Record* record = (Record*) malloc(sizeof(Record));
     while (pos < strlen(line)){
         if (line[pos] == ' ' || line[pos] == '\n'){
             int len = pos - start;
@@ -518,35 +516,28 @@ void add_to_struct(char* line, ManifestRecord** manifest, int recordCount){
                     record->version = temp;
                     break;
                 case 1:
-                    record->projectName = temp;
-                    break;
-                case 2:
                     record->file = temp;
                     break;
-                case 3:
+                case 2:
                     record->hash = temp;
                     count = -1;
                     break;
             }
-            //printf("Word: %s\n", temp);
             count++;
-            //printf("%d %d %d\n", start, pos, len);
             start = pos+1;
         }
-        //printf("%c\n", line[pos]);
         pos++;
     }
-    manifest[recordCount] = record;
+    record_arr[recordCount] = record;
 }
 
-/* Returns an array of Manifest Records */
-ManifestRecord** create_manifest_struct(char* fileData){
+/* Returns an array of records */
+Record** create_record_struct(char* fileData){
     int start = 0;
     Boolean version = false;
     int pos = 0;
     int numberOfRecords = number_of_lines(fileData);
-    //printf("Number of Records %d\n",numberOfRecords);
-    ManifestRecord** manifest = (ManifestRecord**) malloc(sizeof(ManifestRecord*)*numberOfRecords);
+    Record** record_arr = (Record**) malloc(sizeof(Record*)*numberOfRecords);
     int recordCount = 0;
     while (pos < strlen(fileData)){
         if (fileData[pos] == '\n'){
@@ -556,21 +547,19 @@ ManifestRecord** create_manifest_struct(char* fileData){
             strncpy(temp, &fileData[start], len+1);
             temp[len+1] = '\0';
             if (version){ // if version number has already been seen
-                //printf("Line: %s\n", temp);
-                add_to_struct(temp, manifest, recordCount);
+                add_to_struct(temp, record_arr, recordCount);
                 start = pos+1;
                 recordCount++;
                 free(temp);
             }
             else{
-                ManifestRecord* record = (ManifestRecord*) malloc(sizeof(ManifestRecord));
-                char* manifestCount = (char*) malloc(sizeof(char)*50);
-                sprintf(manifestCount, "%d", numberOfRecords);
-                record->projectName = NULL;
+                Record* record = (Record*) malloc(sizeof(Record));
+                char* rec_count = (char*) malloc(sizeof(char)*50);
+                sprintf(rec_count, "%d", numberOfRecords);
                 record->version = temp;
-                record->hash = manifestCount;
                 record->file = NULL;
-                manifest[recordCount] = record;
+                record->hash = recordCount; //the hash stores the number of records!
+                record_arr[rec_count] = record;
                 version = true;
                 start = pos+1;
                 recordCount++;
@@ -578,20 +567,19 @@ ManifestRecord** create_manifest_struct(char* fileData){
         }
         pos++;
     }
-    return manifest;
+    return record_arr;
 }
 
-/* Returns size of manifest which is stored in the first position of the array hash value */
-int getManifestStructSize(ManifestRecord** manifest){
-    return atoi(manifest[0]->hash);
+/* Returns size of record array which is stored in the first position of the array hash value */
+int getRecordStructSize(Record** record_arr){
+    return atoi(record_arr[0]->hash);
 }
-
-/* Look in the manifest for a particular file name formatted as project/filepath */
-Boolean search_manifest(ManifestRecord** manifest, char* targetFile){
+/* Look in the records for a particular file name formatted as project/filepath */
+Boolean search_Record(Record** record_arr, char* targetFile){
     int x = 1;
-    int size = getManifestStructSize(manifest);
+    int size = getRecordStructSize(record_arr);
     while ( x < size){
-        if (strcmp(manifest[x]->file, targetFile) == 0){
+        if (strcmp(record_arr[x]->file, targetFile) == 0){
             return true;
         }
         x++;
@@ -600,15 +588,15 @@ Boolean search_manifest(ManifestRecord** manifest, char* targetFile){
 }
 // ACTION METHODS
 // ============================================================================
-Boolean add_file_to_manifest(char* projectName, char* fileName, char* manifestPath){
-    int fd = open(manifestPath, O_WRONLY | O_APPEND);
+Boolean add_file_to_record(char* projectName, char* fileName, char* recordPath){
+    int fd = open(recordPath, O_WRONLY | O_APPEND);
     if(fd == -1){
         return false;
     }
-    char* fileData = read_file(manifestPath);
-    ManifestRecord** manifest = create_manifest_struct(fileData);
-    if (search_manifest(manifest, fileName)){
-        printf("Fatal Error: File %s already exists in Manifest\n", fileName);
+    char* fileData = read_file(recordPath);
+    Record** record_arr = create_record_struct(fileData);
+    if (search_Record(record_arr, fileName)){
+        printf("Fatal Error: File %s already exists in Record\n", fileName);
     }
     else{
         write(fd, "1",1);
@@ -622,26 +610,26 @@ Boolean add_file_to_manifest(char* projectName, char* fileName, char* manifestPa
         write(fd, "\n", 1);
         free(hashcode);
     }
-    freeManifest(manifest);
+    freeRecord(record_arr);
     free(fileData);
     close(fd);
 }
 
-Boolean remove_file_from_manifest(char* projectName, char* fileName, char* manifestPath){
-    char* fileData = read_file(manifestPath);
-    ManifestRecord** manifest = create_manifest_struct(fileData);
+Boolean remove_file_from_record(char* projectName, char* fileName, char* recordPath){
+    char* fileData = read_file(recordPath);
+    Record** record_arr = create_record_struct(fileData);
     int x = 1;
-    int size = getManifestStructSize(manifest);
-    int fd = open(manifestPath, O_WRONLY | O_TRUNC);
+    int size = getRecordStructSize(record_arr);
+    int fd = open(recordPath, O_WRONLY | O_TRUNC);
     if(fd == -1){
         return false;
     }
-    write(fd, manifest[0]->version, strlen(manifest[0]->version));
+    write(fd, record_arr[0]->version, strlen(record_arr[0]->version));
     Boolean remove = false;
     printf("%s\n", fileName);
     while ( x < size){
-        if (strcmp(fileName, manifest[x]->file) != 0){
-            char* temp = printManifest(manifest[x]);
+        if (strcmp(fileName, record_arr[x]->file) != 0){
+            char* temp = printRecord(record_arr[x]);
             write(fd,temp, strlen(temp));
             write(fd,"\n", 1);
             //printf("%d", x);
@@ -650,14 +638,13 @@ Boolean remove_file_from_manifest(char* projectName, char* fileName, char* manif
         else {
             remove = true;
         }
-        //printf("%s\n", manifest[x]->file);
         x++;
     }
     if (!remove){
-        printf("Fatal Error: Manifest does not contain file\n");
+        printf("Fatal Error: record does not contain file\n");
         return false;
     }
-    freeManifest(manifest);
+    freeRecord(record_arr);
     free(fileData);
     close(fd);
 }
@@ -700,26 +687,26 @@ void write_commit_file(int sockfd, char* project_name, char* server_manifest_dat
     }
     // free(pclient2);
 
-    // /*get server and client manifest files*/
+    // /*get server and client records*/
     char* pclient3 = append_client(10+strlen(project_name)+strlen("./Manifest"));
     strcat(pclient3, project_name);
     strcat(pclient3, "/.Manifest");
-    ManifestRecord** server_manifest = create_manifest_struct(server_manifest_data);
+    Record** server_manifest = create_record_struct(server_record_data);
     char* client_manifest_data = read_file(pclient3);
-    ManifestRecord** client_manifest = create_manifest_struct(client_manifest_data);
-    int client_manifest_size = getManifestStructSize(client_manifest);
-    int server_manifest_size = getManifestStructSize(server_manifest);
+    Record** client_manifest = create_record_struct(client_manifest_data);
+    int client_manifest_size = getRecordStructSize(client_manifest);
+    int server_manifest_size = getRecordStructSize(server_manifest);
     
     /*print out the manifests*/
     int x = 1;
     while (x < client_manifest_size){
-        char* temp = printManifest(client_manifest[x]);
+        char* temp = printRecord(client_manifest[x]);
         printf("%s\n", temp);
         x++;
     }
     x = 1;
     while (x < server_manifest_size){
-        char* temp = printManifest(server_manifest[x]);
+        char* temp = printRecord(server_manifest[x]);
         printf("%s\n", temp);
         x++;
     }
@@ -728,8 +715,8 @@ void write_commit_file(int sockfd, char* project_name, char* server_manifest_dat
     if(strcmp(server_manifest[0]->version, client_manifest[0]->version )!=0 ){
         printf("ERROR client needs to update manifest.\n");
         free(client_manifest_data);
-        freeManifest(server_manifest);
-        freeManifest(client_manifest);
+        freeRecord(server_manifest);
+        freeRecord(client_manifest);
         return;
     }
 
@@ -750,7 +737,7 @@ void write_commit_file(int sockfd, char* project_name, char* server_manifest_dat
     while(i < client_manifest_size){
         /*check to see if they modified the code*/
         char* file_name = client_manifest[i]->file;
-        Boolean found_file = search_manifest(server_manifest, file_name);
+        Boolean found_file = search_Record(server_manifest, file_name);
         Boolean write_file = false;
         if(found_file == true){
             if(strcmp(live_hash_arr[i], client_manifest[i]->hash)!=0){
@@ -759,8 +746,8 @@ void write_commit_file(int sockfd, char* project_name, char* server_manifest_dat
                 int client_file_version = atoi(client_manifest[i]->version);
                 if(server_file_version < client_file_version){
                     free(client_manifest_data);
-                    freeManifest(server_manifest);
-                    freeManifest(client_manifest);
+                    freeRecord(server_manifest);
+                    freeRecord(client_manifest);
                     close(commit_fd);
                     unlink(commit_path); //delete /Commit file
                     printf("ERROR client needs to synch repository with server before committing.\n");
@@ -790,7 +777,7 @@ void write_commit_file(int sockfd, char* project_name, char* server_manifest_dat
     i = 1;
     while(i < server_manifest_size){
         char* file_name = server_manifest[i]->file;
-        Boolean found_file = search_manifest(client_manifest, file_name);
+        Boolean found_file = search_Record(client_manifest, file_name);
         if(found_file == false){
             /*write that client deleted a file*/
             write(commit_fd, "D", 1);          
@@ -824,8 +811,8 @@ void write_commit_file(int sockfd, char* project_name, char* server_manifest_dat
 
     /*Finally free!*/
     free(commit_path);
-    freeManifest(server_manifest);
-    freeManifest(client_manifest);
+    freeRecord(server_manifest);
+    freeRecord(client_manifest);
     free_string_arr(live_hash_arr, client_manifest_size);
 }
 
@@ -880,10 +867,10 @@ int main(int argc, char** argv) {
             /* if manifest exists */
             if (fileExists(manifestFilePath)){
                 if (fileExists(filePath) && (strcmp(argv[1],"add") == 0)) {
-                    add_file_to_manifest(argv[2], filePath, manifestFilePath);
+                    add_file_to_record(argv[2], filePath, manifestFilePath);
                 }
                 else if (strcmp(argv[1],"remove") == 0){
-                    remove_file_from_manifest(argv[2], filePath, manifestFilePath);
+                    remove_file_from_record(argv[2], filePath, manifestFilePath);
                 }
             }
             free (manifestFilePath);
