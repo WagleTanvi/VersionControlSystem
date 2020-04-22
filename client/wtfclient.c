@@ -964,10 +964,10 @@ int read_configure_and_connect()
 }
 
 /*Sending command to create project in server. Returns the fd*/
-int write_to_server(int sockfd, char* argv1, char* argv2){
-    int clen = strlen(argv2)+digits(strlen(argv2))+strlen(argv1)+2;
+int write_to_server(int sockfd, char* argv1, char* argv2, char* project_name){
+    int clen = strlen(argv2)+digits(strlen(project_name))+strlen(argv1)+2;
     char* command = (char*)malloc(clen+1*sizeof(char)); 
-    snprintf(command, clen+1, "%s:%d:%s", argv1, strlen(argv2), argv2);
+    snprintf(command, clen+1, "%s:%d:%s", argv1, strlen(project_name), argv2);
     char* new_command = (char*)malloc(strlen(command)+digits(strlen(command))+1 * sizeof(char));
     new_command[0] = '\0';
     strcat(new_command, to_Str((strlen(command))));
@@ -999,7 +999,7 @@ int main(int argc, char **argv)
     else if (argc == 3 && (strcmp(argv[1], "create") == 0 || strcmp(argv[1], "checkout") == 0))
     {
         sockfd = read_configure_and_connect();
-        int n = write_to_server(sockfd, argv[1], argv[2]);
+        int n = write_to_server(sockfd, argv[1], argv[2], argv[2]);
         if (n < 0)
             printf("ERROR writing to socket.\n");
         else
@@ -1015,7 +1015,7 @@ int main(int argc, char **argv)
     else if (argc == 3 && (strcmp(argv[1], "destroy") == 0))
     {
         sockfd = read_configure_and_connect();
-        int n = write_to_server(sockfd, argv[1], argv[2]);
+        int n = write_to_server(sockfd, argv[1], argv[2], argv[2]);
         if (n < 0)
             printf("ERROR writing to socket.\n");
         else
@@ -1062,19 +1062,39 @@ int main(int argc, char **argv)
         update(argv[2]);
     }
     else if(argc == 3 && (strcmp(argv[1], "commit")==0)){
-        //pretty sure commit does not work right now? idk didn't test yet, im scared
-
-        // sockfd = read_configure_and_connect();
-        // int n = write_to_server(sockfd, "manifest", argv[2]);
-        // if(n < 0)
-        //     printf("ERROR writing to socket.\n");
-        // else{
-        //     char* buffer = read_from_server(sockfd);
-        //     write_commit_file(sockfd, argv[2], buffer);
-        // } 
+        sockfd = read_configure_and_connect();
+        int n = write_to_server(sockfd, "manifest", argv[2], argv[2]);
+        if(n < 0)
+            printf("ERROR writing to socket.\n");
+        else{
+            char* buffer = read_from_server(sockfd);
+            write_commit_file(sockfd, argv[2], buffer);
+        } 
     }
     else if(argc == 3 && (strcmp(argv[1], "push")==0)){
-    
+        /*Get the data from the commit file*/
+        sockfd = read_configure_and_connect();
+        char* commit_file = (char*)malloc(strlen(argv[2])+strlen("/.Commit"));
+        commit_file[0]='\0';
+        strcat(commit_file, argv[2]); 
+        strcat(commit_file, "/.Commit");
+        char* commitfile_content = read_file(commit_file);
+
+        /*attach everything*/
+        char* sec_cmd = (char*)malloc(strlen(argv[2])+1+digits(strlen(commitfile_content))+1+strlen(commitfile_content));
+        sec_cmd[0] = '\0';
+        strcat(sec_cmd, argv[2]);
+        strcat(sec_cmd, ":");
+        strcat(sec_cmd, to_Str(strlen(commitfile_content)));
+        strcat(sec_cmd, ":");
+        strcat(sec_cmd, commitfile_content);
+
+        int n = write_to_server(sockfd, argv[1], sec_cmd, argv[2]);
+        if(n < 0)
+            printf("ERROR writing to socket.\n");
+        else{
+            char* buffer = read_from_server(sockfd);
+        } 
     }
     else {
         printf("Fatal Error: Invalid Arguments\n");

@@ -10,19 +10,10 @@ clean:
 	rm ./client/WTF ./server/WTFServer
 
 gdbserver:
-	gdb ./server/WTFServer
+	gdb ./WTFServer
 
 gdbclient:
-	gdb ./client/WTF
+	gdb ./WTF
 
 runserver:
-	./server/WTFServer 8006
-
-create:
-	./client/WTF create project
-
-checkout:
-	./client/WTF checkout projectTwo
-
-destroy:
-	./client/WTF destroy projectTwo
+	./WTFServer 8006
