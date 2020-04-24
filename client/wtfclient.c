@@ -230,6 +230,7 @@ void free_string_arr(char **arr, int size)
 }
 
 /* Free Record Array */
+<<<<<<< HEAD
 // u = update/commmit/conflict file
 // m = manifest file
 // a = appended records
@@ -259,6 +260,21 @@ void freeRecord(Record **record_arr, char flag, int size)
             free(record_arr[x]->hash);
             free(record_arr[x]);
         }
+=======
+void freeRecord(Record **record_arr)
+{
+    int size = getRecordStructSize(record_arr);
+    free(record_arr[0]->version);
+    free(record_arr[0]->hash);
+    free(record_arr[0]);
+    int x = 1;
+    while (x < size)
+    {
+        free(record_arr[x]->version);
+        free(record_arr[x]->file);
+        free(record_arr[x]->hash);
+        free(record_arr[x]);
+>>>>>>> 6cbde89b839db3a1ae6f0ae990c261c211ffd254
         x++;
     }
     if (record_arr != NULL)
@@ -285,6 +301,11 @@ char *printRecord(Record *record)
         strcat(line, " ");
         strcat(line, record->file);
         strcat(line, " ");
+<<<<<<< HEAD
+=======
+        strcat(line, record->file);
+        strcat(line, " ");
+>>>>>>> 6cbde89b839db3a1ae6f0ae990c261c211ffd254
         strcat(line, record->hash);
         return line;
     }
@@ -404,7 +425,11 @@ void add_to_struct(char *line, Record **record_arr, int recordCount)
 }
 
 /* Returns an array of records */
+<<<<<<< HEAD
 Record **create_record_struct(char *fileData, Boolean manifest)
+=======
+Record **create_record_struct(char *fileData)
+>>>>>>> 6cbde89b839db3a1ae6f0ae990c261c211ffd254
 {
     int start = 0;
     Boolean version = !manifest;
@@ -430,10 +455,16 @@ Record **create_record_struct(char *fileData, Boolean manifest)
             temp[0] = '\0';
             strncpy(temp, &fileData[start], len + 1);
             temp[len + 1] = '\0';
+<<<<<<< HEAD
             // printf("YES: %s\n", temp);
             if (version)
             { // if version number has already been seen
                 //printf("YES: %s\n", temp);
+=======
+            if (version)
+            { // if version number has already been seen
+                //printf("%s\n", temp);
+>>>>>>> 6cbde89b839db3a1ae6f0ae990c261c211ffd254
                 add_to_struct(temp, record_arr, recordCount);
                 start = pos + 1;
                 recordCount++;
@@ -542,9 +573,15 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
     char *pclient3 = append_client(10 + strlen(project_name) + strlen("./Manifest"));
     strcat(pclient3, project_name);
     strcat(pclient3, "/.Manifest");
+<<<<<<< HEAD
     Record **server_manifest = create_record_struct(server_record_data, true);
     char *client_manifest_data = read_file(pclient3);
     Record **client_manifest = create_record_struct(client_manifest_data, true);
+=======
+    Record **server_manifest = create_record_struct(server_record_data);
+    char *client_manifest_data = read_file(pclient3);
+    Record **client_manifest = create_record_struct(client_manifest_data);
+>>>>>>> 6cbde89b839db3a1ae6f0ae990c261c211ffd254
     int client_manifest_size = getRecordStructSize(client_manifest);
     int server_manifest_size = getRecordStructSize(server_manifest);
 
@@ -1038,6 +1075,45 @@ void upgrade(char *projectName, int sockfd)
 }
 
 //=========================== UPDATE METHODS==================================================================
+int read_len_message(int fd)
+{
+    //printf("um");
+    char *buffer = (char *)malloc(sizeof(char) * 50);
+    bzero(buffer, 50);
+    int status = 0;
+    int readIn = 0;
+    do
+    {
+        status = read(fd, buffer + readIn, 1);
+        readIn += status;
+        //printf("hey");
+    } while (buffer[readIn - 1] != ':' && status > 0);
+    char *num = (char *)malloc(sizeof(char) * strlen(buffer));
+    strncpy(num, buffer, strlen(buffer) - 1);
+    num[strlen(buffer) - 1] = '\0';
+    free(buffer);
+    int len = atoi(num); //- strlen(num) - 1;
+    //printf("%d\n", len);
+    free(num);
+    return len;
+}
+/* blocking read */
+char *block_read(int fd, int targetBytes)
+{
+    char *buffer = (char *)malloc(sizeof(char) * targetBytes + 1);
+    memset(buffer, '\0', targetBytes + 1);
+    int status = 0;
+    int readIn = 0;
+    do
+    {
+        status = read(fd, buffer + readIn, targetBytes - readIn);
+        readIn += status;
+    } while (status > 0 && readIn < targetBytes);
+    buffer[targetBytes] = '\0';
+    if (readIn < 0)
+        printf("ERROR reading from socket");
+    return buffer;
+}
 
 void update(char *projectName, int sockfd)
 {
@@ -1051,8 +1127,13 @@ void update(char *projectName, int sockfd)
     strcpy(manifestFilePath, projectName);
     strcat(manifestFilePath, "/.Manifest");
     char *fileData = read_file(manifestFilePath);
+<<<<<<< HEAD
     Record **manifestClient = create_record_struct(fileData, true);
     // free(manifestFilePath);
+=======
+    Record **manifestClient = create_record_struct(fileData);
+    free(manifestFilePath);
+>>>>>>> 6cbde89b839db3a1ae6f0ae990c261c211ffd254
     free(fileData);
     /* send manifest command */
     int projNumLen = digits(strlen(projectName));
@@ -1083,8 +1164,14 @@ void update(char *projectName, int sockfd)
         printf("%s", serverData);
         return;
     }
+<<<<<<< HEAD
     Record **manifestServer = create_record_struct(serverData, true);
     free(serverData);
+=======
+    Record **manifestServer = create_record_struct(serverData);
+    free(serverData);
+    // printAllRecords(manifestServer);
+>>>>>>> 6cbde89b839db3a1ae6f0ae990c261c211ffd254
     // printAllRecords(manifestClient);
     /*check versions of both structs*/
     // versions are the same
@@ -1107,7 +1194,11 @@ void update(char *projectName, int sockfd)
         printf("Fatal Error: Could not open Update file");
     }
     /* Temp */
+<<<<<<< HEAD
     char *tempFilePath = (char *)malloc(strlen(projectName) + 1 + 6);
+=======
+    char *tempFilePath = (char *)malloc(strlen(projectName) + 1 + 10);
+>>>>>>> 6cbde89b839db3a1ae6f0ae990c261c211ffd254
     strcpy(tempFilePath, projectName);
     strcat(tempFilePath, "/.Temp");
     int fd = open(tempFilePath, O_WRONLY | O_CREAT | O_TRUNC, 00600);
@@ -1115,6 +1206,7 @@ void update(char *projectName, int sockfd)
     {
         printf("Fatal Error: Could not open file");
     }
+<<<<<<< HEAD
     /* Temp Server Path */
     char *tempServerFilePath = (char *)malloc(strlen(projectName) + 1 + 16);
     strcpy(tempServerFilePath, projectName);
@@ -1124,6 +1216,9 @@ void update(char *projectName, int sockfd)
     {
         printf("Fatal Error: Could not open file");
     }
+=======
+
+>>>>>>> 6cbde89b839db3a1ae6f0ae990c261c211ffd254
     if (strcmp(manifestServer[0]->version, manifestClient[0]->version) == 0)
     {
         printf("No updates from server\n");
@@ -1135,8 +1230,13 @@ void update(char *projectName, int sockfd)
         free(tempFilePath);
         free(updateFilePath);
         free(conflictFilePath);
+<<<<<<< HEAD
         freeRecord(manifestClient, 'm', getRecordStructSize(manifestClient));
         freeRecord(manifestServer, 'm', getRecordStructSize(manifestServer));
+=======
+        freeRecord(manifestClient);
+        freeRecord(manifestServer);
+>>>>>>> 6cbde89b839db3a1ae6f0ae990c261c211ffd254
         return;
     }
     int size = getRecordStructSize(manifestServer);
@@ -1154,11 +1254,15 @@ void update(char *projectName, int sockfd)
             snprintf(temp, len + 1, "%s %s %s", "'A", manifestServer[x]->file, manifestServer[x]->hash);
             block_write(fd, temp, len);
             write(fd, "\n", 1);
+<<<<<<< HEAD
             /* will remove this if I decide to add to upgrade */
+=======
+>>>>>>> 6cbde89b839db3a1ae6f0ae990c261c211ffd254
         }
         else
         {
             char *clientHash = manifestClient[clientIndex]->hash;
+<<<<<<< HEAD
             if (strcmp(manifestServer[x]->version, manifestClient[clientIndex]->version) != 0)
             {
                 char *currentFileData = read_file(manifestServer[x]->file);
@@ -1180,7 +1284,27 @@ void update(char *projectName, int sockfd)
                 }
                 free(currentFileData);
                 free(currentHash);
+=======
+            char *currentFileData = read_file(manifestServer[x]->file);
+            char *currentHash = getHash(currentFileData);
+            if (strcmp(currentHash, clientHash) == 0 && strcmp(manifestServer[x]->hash, clientHash) != 0)
+            { // live hash and manifest client hash same
+                printf("'M %s\n", manifestServer[x]->file);
+                snprintf(temp, len + 1, "%s %s %s", "'M", manifestServer[x]->file, manifestServer[x]->hash);
+                block_write(fd, temp, len);
+                write(fd, "\n", 1);
             }
+            else if (strcmp(currentHash, clientHash) != 0 && strcmp(manifestServer[x]->hash, clientHash) != 0)
+            {
+                printf("'C %s\n", manifestServer[x]->file);
+                snprintf(temp, len + 1, "%s %s %s", "'C", manifestServer[x]->file, manifestServer[x]->hash);
+                block_write(fd, temp, len);
+                write(fd, "\n", 1);
+                conflict = true;
+>>>>>>> 6cbde89b839db3a1ae6f0ae990c261c211ffd254
+            }
+            free(currentFileData);
+            free(currentHash);
         }
         free(temp);
         x++;
@@ -1192,7 +1316,11 @@ void update(char *projectName, int sockfd)
         int serverIndex = search_record_hash(manifestServer, manifestClient[x]->file);
         if (serverIndex == -1)
         { // file from client is not in server.
+<<<<<<< HEAD
             //char *serverHash = manifestServer[serverIndex]->hash;
+=======
+            char *serverHash = manifestServer[serverIndex]->hash;
+>>>>>>> 6cbde89b839db3a1ae6f0ae990c261c211ffd254
             int len = 4 + strlen(manifestClient[x]->file) + strlen(manifestClient[x]->hash);
             char *temp = (char *)malloc(sizeof(char *) * (len) + 1);
             printf("'D %s\n", manifestClient[x]->file);
@@ -1208,6 +1336,7 @@ void update(char *projectName, int sockfd)
     if (fd == -1)
     {
         printf("Fatal Error: Could not open file");
+<<<<<<< HEAD
     }
     if (conflict == true)
     {
@@ -1223,12 +1352,67 @@ void update(char *projectName, int sockfd)
     {
         char *fileData = read_file(tempFilePath);
         write(ufd, fileData, strlen(fileData));
+=======
+    }
+    if (conflict == true)
+    {
+        char *fileData = read_file(tempFilePath);
+        write(cfd, fileData, strlen(fileData));
+        free(fileData);
+        close(ufd);
+        close(cfd);
+        unlink(updateFilePath);
+    }
+    else
+    {
+        char *fileData = read_file(tempFilePath);
+        write(ufd, fileData, strlen(fileData));
+        free(fileData);
+        close(ufd);
+        close(cfd);
+        unlink(conflictFilePath);
+    }
+    freeRecord(manifestClient);
+    freeRecord(manifestServer);
+    unlink(tempFilePath);
+    free(tempFilePath);
+    free(updateFilePath);
+    free(conflictFilePath);
+}
+
+//===================================== ADD/REMOVE METHODS ============================================================================
+Boolean add_file_to_record(char *projectName, char *fileName, char *recordPath)
+{
+    int fd = open(recordPath, O_WRONLY | O_APPEND);
+    if (fd == -1)
+    {
+        return false;
+    }
+    char *manifestData = read_file(recordPath);
+    Record **record_arr = create_record_struct(manifestData);
+    if (search_Record(record_arr, fileName))
+    {
+        printf("Fatal Error: File %s already exists in Record\n", fileName);
+    }
+    else
+    {
+        write(fd, "1", 1);
+        write(fd, " ", 1);
+        write(fd, fileName, strlen(fileName));
+        write(fd, " ", 1);
+        char *fileData = read_file(fileName);
+        char *hashcode = getHash(fileData);
+        write(fd, hashcode, strlen(hashcode));
+        write(fd, "\n", 1);
+        free(hashcode);
+>>>>>>> 6cbde89b839db3a1ae6f0ae990c261c211ffd254
         free(fileData);
         close(ufd);
         close(cfd);
         unlink(conflictFilePath);
         write_record_to_file(tfd, manifestServer, false, getRecordStructSize(manifestServer));
     }
+<<<<<<< HEAD
     freeRecord(manifestClient, 'm', getRecordStructSize(manifestClient));
     freeRecord(manifestServer, 'm', getRecordStructSize(manifestServer));
     unlink(tempFilePath);
@@ -1237,6 +1421,51 @@ void update(char *projectName, int sockfd)
     free(tempServerFilePath);
     free(conflictFilePath);
     free(manifestFilePath);
+=======
+    freeRecord(record_arr);
+    free(manifestData);
+    close(fd);
+}
+
+Boolean remove_file_from_record(char *projectName, char *fileName, char *recordPath)
+{
+    char *fileData = read_file(recordPath);
+    Record **record_arr = create_record_struct(fileData);
+    int x = 1;
+    int size = getRecordStructSize(record_arr);
+    int fd = open(recordPath, O_WRONLY | O_TRUNC);
+    if (fd == -1)
+    {
+        return false;
+    }
+    write(fd, record_arr[0]->version, strlen(record_arr[0]->version));
+    Boolean remove = false;
+    printf("%s\n", fileName);
+    while (x < size)
+    {
+        if (strcmp(fileName, record_arr[x]->file) != 0)
+        {
+            char *temp = printRecord(record_arr[x]);
+            write(fd, temp, strlen(temp));
+            write(fd, "\n", 1);
+            //printf("%d", x);
+            free(temp);
+        }
+        else
+        {
+            remove = true;
+        }
+        x++;
+    }
+    if (!remove)
+    {
+        printf("Fatal Error: record does not contain file\n");
+        return false;
+    }
+    freeRecord(record_arr);
+    free(fileData);
+    close(fd);
+>>>>>>> 6cbde89b839db3a1ae6f0ae990c261c211ffd254
 }
 
 //=================================================== CREATE ===============================================================
@@ -1526,6 +1755,7 @@ int main(int argc, char **argv)
         block_write(sockfd, "6:Done", 6);
         printf("Client Disconnecting\n");
         close(sockfd);
+<<<<<<< HEAD
     }
     else if (argc == 3 && (strcmp(argv[1], "upgrade") == 0))
     {
@@ -1535,6 +1765,8 @@ int main(int argc, char **argv)
         block_write(sockfd, "6:Done", 6);
         printf("Client Disconnecting\n");
         close(sockfd);
+=======
+>>>>>>> 6cbde89b839db3a1ae6f0ae990c261c211ffd254
     }
     else if (argc == 3 && (strcmp(argv[1], "commit") == 0))
     {
