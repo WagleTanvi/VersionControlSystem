@@ -11,22 +11,15 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <libgen.h>
+#include "record.h"
 
-typedef struct Record{
-    char* version; //for manifest it is the version number, for upgrade and push it is the command 'M','A', or 'D'
-    char* file; //file path (includes the project name)
-    unsigned char* hash;
-} Record;
-
-int max_arr_size = 100;
-int g_count = 0;
-
-typedef enum Boolean {true = 1, false = 0} Boolean;
+int cmd_count = 0;
 
 //================== PROTOTYPES===========================================
 void destroyProject(char* buffer, int clientSoc);
 int remove_directory(char* dirPath);
 void block_write(int fd, char* data, int targetBytes);
+void duplicate_dir(char* project_path, char* new_project_path);
 
 //================== HELPER METHODS========================================
 /*Count digits in a number*/
@@ -165,7 +158,7 @@ Boolean search_proj_exists(char* project_name){
     struct dirent *d;
     DIR *dir = opendir("./");
     if (dir == NULL){
-        return 0;
+        return false;
     }    
     while ((d = readdir(dir)) != NULL) {
         if(strcmp(d->d_name, project_name)==0){
@@ -190,171 +183,119 @@ int number_of_lines(char* fileData){
     return count;
 }
 
-// ========================= RECORD METHODS =================================================
+//=============================== CURRENT VERSION ======================
 
-/* Parses one line of the Record and addes to stuct */
-void add_to_struct(char* line, Record** record_arr, int recordCount){
-    int start = 0;
-    int pos = 0;
-    int count = 0;
-    Record* record = (Record*) malloc(sizeof(Record));
-    while (pos < strlen(line)){
-        if (line[pos] == ' ' || line[pos] == '\n'){
-            int len = pos - start;
-            char* temp = (char*) malloc(sizeof(char)*len+1);
-            temp[0] = '\0';
-            strncpy(temp, &line[start], len);
-            temp[len] = '\0';
-            switch (count){
-                case 0:
-                    record->version = temp;
-                    break;
-                case 1:
-                    record->file = temp;
-                    break;
-                case 2:
-                    record->hash = temp;
-                    count = -1;
-                    break;
+char* get_current_version(char* buffer, int clientSoc){
+    /*get project name and check if the project exists in the server*/
+    int bcount = 0;
+    char* cmd = strtok(buffer, ":");
+    bcount += strlen(cmd)+1;
+    char* plens = strtok(NULL, ":");
+    bcount += strlen(plens)+1;
+    int pleni = atoi(plens);
+    char* project_name = getSubstring(bcount, buffer, pleni);
+    int foundProj = search_proj_exists(project_name);
+    if(foundProj==0){
+        free(project_name);
+        int n = write(clientSoc, "ERROR project not in the server.\n", 36);
+        if(n < 0) printf("ERROR writing to the client.\n");
+        return;
+    }
+
+    /*Read the manifest file*/
+    char* manifestpath = (char*)malloc(strlen(project_name)+strlen("./Manifest")*sizeof(char));
+    manifestpath[0]='\0';
+    strcat(manifestpath, project_name);
+    strcat(manifestpath, "/.Manifest");
+    char* manifest_data = getFileContent(manifestpath, "");
+    Record** manifest = create_record_struct(manifest_data, 0, 'M');
+
+    return manifest[0]->version;
+}
+
+//=============================== ROLLBACK ======================
+//23:projectname:13
+void rollback(char* buffer, int clientSoc){
+    /*get project name and check if the project exists in the server*/
+    int bcount = 0;
+    char* cmd = strtok(buffer, ":");
+    bcount += strlen(cmd)+1;
+    char* plens = strtok(NULL, ":");
+    bcount += strlen(plens)+1;
+    int pleni = atoi(plens);
+    char* project_name = getSubstring(bcount, buffer, pleni);
+    int foundProj = search_proj_exists(project_name);
+    if(foundProj==0){
+        free(project_name);
+        int n = write(clientSoc, "ERROR project not in the server.\n", 36);
+        if(n < 0) printf("ERROR writing to the client.\n");
+        return;
+    }    
+
+    /*Get the version number*/
+    bcount += (strlen(project_name)+1);
+    int count = bcount;
+    while(buffer[count]!='\0'){
+        count++;
+    }
+    int nlen = count-bcount;
+    int req_version = atoi(getSubstring(bcount, buffer, nlen));
+
+    /*Traverse history folder - if the version number is greater then the requested then delete that version*/
+    char* history_dir = (char*)malloc(strlen(project_name)+strlen("/history\0")*sizeof(char));
+    history_dir[0]='\0';
+    strcat(history_dir, project_name);
+    strcat(history_dir, "/history\0");
+    char* new_project_name;
+    Boolean found = false;
+    char path[4096];
+    struct dirent *d;
+    DIR *dir = opendir(history_dir);
+    if (dir == NULL){
+        printf("ERROR this is not a directory.\n");
+    }
+    while ((d = readdir(dir)) != NULL) {    
+        snprintf(path, 4096, "%s/%s", history_dir, d->d_name);    
+        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0) continue;
+        if (d->d_type == DT_DIR){
+            int version_num = atoi(get_current_version(d->d_name, clientSoc));
+            if(version_num == req_version){
+                found = true;
+                new_project_name = d->d_name;
+                break;
             }
-            count++;
-            start = pos+1;
-        }
-        pos++;
-    }
-    record_arr[recordCount] = record;
-}
-
-/* Returns an array of records */
-Record** create_record_struct(char* fileData){
-    int start = 0;
-    Boolean version = false;
-    int pos = 0;
-    int numberOfRecords = number_of_lines(fileData);
-    Record** record_arr = (Record**) malloc(sizeof(Record*)*numberOfRecords);
-    int recordCount = 0;
-    while (pos < strlen(fileData)){
-        if (fileData[pos] == '\n'){
-            int len = pos - start;
-            char* temp = (char*) malloc(sizeof(char)*len+2);
-            temp[0] = '\0';
-            strncpy(temp, &fileData[start], len+1);
-            temp[len+1] = '\0';
-            if (version){ // if version number has already been seen
-                add_to_struct(temp, record_arr, recordCount);
-                start = pos+1;
-                recordCount++;
-                free(temp);
-            }
-            else{
-                Record* record = (Record*) malloc(sizeof(Record));
-                char* rec_count = (char*) malloc(sizeof(char)*50);
-                sprintf(rec_count, "%d", numberOfRecords);
-                record->version = temp;
-                record->file = NULL;
-                record->hash = rec_count; //the hash stores the number of records!
-                record_arr[recordCount] = record;
-                version = true;
-                start = pos+1;
-                recordCount++;
+            else if(version_num > req_version){
+                rmdir(path);
             }
         }
-        pos++;
     }
-    return record_arr;
+    closedir(dir);
+    if(found == false){
+        printf("ERROR version was not found. Choose a different version.\n");
+        return;
+    }
+
+    /*Destory the current proejct and move this project outside the history folder and rename it*/
+    char* project_path = (char*)malloc(strlen(project_name)+strlen("/history/")+strlen(new_project_name)*sizeof(char));
+    project_path[0]='\0';
+    strcat(project_path, project_name);
+    strcat(project_path, "/history\0");
+    strcat(project_path, new_project_name);
+
+    char* new_project_path = (char*)malloc(strlen(project_name)+strlen(new_project_name)+1*sizeof(char));
+    new_project_path[0]='\0';
+    strcat(new_project_path, project_name);
+    strcat(new_project_path, "/");
+    strcat(new_project_path, new_project_name);
+
+    duplicate_dir(project_path, new_project_path);
+    destroyProject(project_name, clientSoc);
+    destroyProject(project_path, clientSoc);
+
+    /*Send a success to the client.*/
+    block_write(clientSoc, "37:Server has successfully rolled back.\0", 40);
 }
 
-/* Returns size of record array which is stored in the first position of the array hash value */
-int getRecordStructSize(Record** record_arr){
-    return atoi(record_arr[0]->hash);
-}
-
-/* Look in the record array for a particular file name formatted as project/filepath */
-Record* search_record(Record** record_arr, char* targetFile){
-    int x = 1;
-    int size = getRecordStructSize(record_arr);
-    while (x < size){
-        if (strcmp(record_arr[x]->file, targetFile) == 0){
-            return record_arr[x];
-        }
-        x++;
-    }
-    return NULL;
-}
-
-/* Formats one record */
-char* printRecord(Record* record){
-    int len;
-    if (record == NULL){
-        return NULL;
-    }
-    else{
-        int len = strlen(record->version)+strlen(record->file)+strlen(record->hash) + 1 + 3;
-        char* line = (char*) malloc(sizeof(char)*len);
-        line[0] = '\0';
-        strcat(line, record->version);
-        strcat(line, " ");
-        strcat(line, " ");
-        strcat(line,record->file );
-        strcat(line, " ");
-        strcat(line,record->hash );
-        return line;
-    }
-}
-
-Boolean add_file_to_record(char* recordPath, char* fileName, char* hash){
-    int fd = open(recordPath, O_WRONLY | O_APPEND);
-    if(fd == -1){
-        return false;
-    }
-    char* fileData = getFileContent(recordPath, "");
-    Record** record_arr = create_record_struct(fileData);
-    if (search_record(record_arr, fileName)){
-        printf("Fatal Error: File %s already exists in Record\n", fileName);
-    }
-    else
-    {
-        write(fd, "1", 1);
-        write(fd, " ", 1);
-        write(fd, fileName, strlen(fileName));
-        write(fd, " ", 1);
-        write(fd, hash, strlen(hash));
-        write(fd, "\n", 1);
-    }
-    close(fd);
-}
-
-Boolean remove_file_from_record(char* recordPath, char* fileName){
-    char* fileData = getFileContent(recordPath, "");
-    Record** record_arr = create_record_struct(fileData);
-    int x = 1;
-    int size = getRecordStructSize(record_arr);
-    int fd = open(recordPath, O_WRONLY | O_TRUNC);
-    if(fd == -1){
-        return false;
-    }
-    write(fd, record_arr[0]->version, strlen(record_arr[0]->version));
-    Boolean remove = false;
-    printf("%s\n", fileName);
-    while ( x < size){
-        if (strcmp(fileName, record_arr[x]->file) != 0){
-            char* temp = printRecord(record_arr[x]);
-            write(fd,temp, strlen(temp));
-            write(fd,"\n", 1);
-            free(temp);
-        }
-        else
-        {
-            remove = true;
-        }
-        x++;
-    }
-    if (!remove){
-        printf("Fatal Error: record does not contain file\n");
-        return false;
-    }
-    close(fd);
-}
 
 //=============================== PUSH ======================
 /*Given a project name, duplicate the directory*/
@@ -381,7 +322,6 @@ void duplicate_dir(char* project_path, char* new_project_path){
         }
     }
     closedir(dir);
-
 }
 
 //push:23:projectname:234:blahblahcommintcontent
@@ -396,7 +336,7 @@ void push_commits(char* buffer, int clientSoc){
     char* project_name = getSubstring(bcount, buffer, pleni);
     int foundProj = search_proj_exists(project_name);
     if(foundProj==0){
-        free(project_name);
+        //free(project_name);
         int n = write(clientSoc, "ERROR project not in the server.\n", 36);
         if(n < 0) printf("ERROR writing to the client.\n");
         return;
@@ -411,77 +351,84 @@ void push_commits(char* buffer, int clientSoc){
     int nlen = count-bcount;
     char* size = getSubstring(bcount, buffer, nlen);
     bcount += (strlen(size)+1);
-    char* file_content = (char*)malloc(atoi(size)*sizeof(char));
-    int i = 0;
-    while(i < atoi(size)){
-        file_content[i] = buffer[bcount+i];
-        i++;
-    }
-    file_content[atoi(size)] = '\0';
+    char* file_content = getSubstring(bcount, buffer, atoi(size));
+    bcount +=(strlen(file_content)+1);
 
-    /*Get server commit file and compare withe the client commit file*/
+    /*Get server commit file and compare with the client commit file*/
     char* pserver = (char*)malloc(strlen(project_name)+strlen("/.Commit"));
     pserver[0]='\0';
     strcat(pserver, project_name); 
     strcat(pserver, "/.Commit");
     char* server_file_content = getFileContent(pserver, "");
-    // if(strcmp(file_content, server_file_content)!=0){
-    //     printf("ERROR the client and sever commit files do not match.\n");
-    //     return;
-    // }
+    if(strcmp(file_content, server_file_content)!=0){
+        printf("ERROR the client and sever commit files do not match.\n");
+        return;
+    }
+    int num = number_of_lines(server_file_content);
 
-    /*Get the current manifest*/
+    /*Get the manifest file data*/
+    count = bcount;
+    while(buffer[count]!=':'){
+        count++;
+    }
+    nlen = count-bcount;
+    char* size2 = getSubstring(bcount, buffer, nlen);
+    bcount += (strlen(size2)+1);
+    char* file_content2 = getSubstring(bcount, buffer, atoi(size2));
+    bcount += (strlen(file_content2)+1);
+
+    /*Get the current server manifest that is in the folder*/
     char* manifestpath = (char*)malloc(strlen(project_name)+strlen("./Manifest")*sizeof(char));
     manifestpath[0]='\0';
     strcat(manifestpath, project_name);
     strcat(manifestpath, "/.Manifest");
     char* manifest_data = getFileContent(manifestpath, "");
-    Record** manifest = create_record_struct(manifest_data);
-    int manifest_size = getRecordStructSize(manifest);
+    Record** server_manifest = create_record_struct(manifest_data, num, 'M');
+    int server_manifest_size = getRecordStructSize(server_manifest);
+
+    /*Get the client manifest- make it into a record struct*/
+    Record** client_manifest = create_record_struct(file_content2, 0, 'M');
 
     /*make a history folder to store all the old commits*/
-    char* history_dir = (char*)malloc(sizeof(char)*strlen("history\0"));
+    char* history_dir = (char*)malloc(strlen(project_name)+strlen("/history\0")*sizeof(char));
     history_dir[0]='\0';
-    strcat(history_dir, "history\0"); 
+    strcat(history_dir, project_name);
+    strcat(history_dir, "/history\0"); 
     mkdir_recursive(history_dir);
     int ch = chmod(history_dir, 0775);
     if(ch<0) printf("ERROR set permission error.\n");
 
     /*move old project to the history folder*/
-    char* pname = (char*)malloc(strlen(project_name)*sizeof(char));
-    pname[0]='\0';
-    strcat(pname, project_name);    
     char* new_project_name = (char*)malloc(strlen(project_name)+3*sizeof(char));
-    int project_version = atoi(manifest[0]->version)+1;
+    int project_version = atoi(server_manifest[0]->version);
     new_project_name[0] = '\0';
     strcat(new_project_name, project_name);
     strcat(new_project_name, "-");
     strcat(new_project_name, to_Str(project_version));
-    char* new_project_path = (char*)malloc(strlen(new_project_name)+strlen("history/")*sizeof(char));
-    char history[9] = "history/\0";
-    int k = 0;
-    while(k < 9){
-        new_project_path[k] = history[k];
-        k++;
-    }
+
+    char* new_project_path = (char*)malloc(strlen(project_name)+strlen(new_project_name)+strlen("history/")*sizeof(char));
+    new_project_path[0] = '\0';
+    strcat(new_project_path, project_name);
+    strcat(new_project_path, "/history/");
     strcat(new_project_path, new_project_name);
-    duplicate_dir(pname, new_project_path);
+    duplicate_dir(project_name, new_project_path);
 
 
     /*do the stuff that is in the commit-modify the manifest too*/
-    Record** active_commit = create_record_struct(file_content);
-    int commit_size = getRecordStructSize(active_commit);
-    int x = 1;
+    Record** active_commit = create_record_struct(file_content, 0, 'C');
+    int commit_size = number_of_lines(file_content);
+    int x = 0;
     while(x < commit_size){
         if(strcmp(active_commit[x]->version, "M")==0){ //modify code
             char* filepath = active_commit[x]->file;
-            Record* manifest_rec = search_record(manifest, filepath);
+            Record* manifest_rec = search_record(server_manifest, filepath);
+            Record* client_manifest_rec = search_record(client_manifest, filepath);
             if(manifest_rec != NULL){
+                manifest_rec->version = to_Str(atoi(client_manifest_rec->version));
                 manifest_rec->hash = active_commit[x]->hash;
             } else {
                 printf("ERROR could not find the file in the manifest. Update?\n");
             }
-            /*how to change it in the manifest file??*/
         }
         else if(strcmp(active_commit[x]->version, "A")==0){ //add file
             /*make commit file*/
@@ -491,7 +438,8 @@ void push_commits(char* buffer, int clientSoc){
                 printf("ERROR unable to make new file: %s\n", strerror(errno));
                 return;
             }
-            Record* manifest_rec = search_record(manifest, filepath);
+            /*add the new file to the manifest*/
+            Record* manifest_rec = search_record(server_manifest, filepath);
             if(manifest_rec != NULL){
                 printf("ERROR already exists in manifest.\n");
             } else {
@@ -499,28 +447,56 @@ void push_commits(char* buffer, int clientSoc){
                 new_manifest_rec->version = "1";
                 new_manifest_rec->file = filepath;
                 new_manifest_rec->hash = active_commit[x]->hash;        
-                Boolean s = add_file_to_record(manifestpath, filepath, active_commit[x]->hash);
+                int m = 0;
+                while(server_manifest[m]!=NULL && m < server_manifest_size){
+                    m++;
+                }
+                if(server_manifest[m]!=NULL && m != server_manifest_size) server_manifest[m] = new_manifest_rec;
             }
         }
         else if(strcmp(active_commit[x]->version, "D")==0){ //delete file
             char* filepath = active_commit[x]->file;
             int r = unlink(filepath);
-            Record* new_manifest_rec = search_record(manifest, filepath);
+            Record* new_manifest_rec = search_record(server_manifest, filepath);
             if(new_manifest_rec != NULL){
                 new_manifest_rec = NULL;
             } else {
                 printf("ERROR could not find the file in the manifest. Update?\n");
             }
-            Boolean s = remove_file_from_record(manifestpath, filepath);
         }
         else{
             printf("ERROR action not implemented.\n");
         }
         x++;
-    }    
+    }   
+
+    /*re-make the manifest file*/
+    int u = remove(manifestpath);
+    int new_manifest_file = open(manifestpath, O_WRONLY | O_CREAT | O_TRUNC, 0775);
+    x = 0;
+    while(x < server_manifest_size){
+        if(x == 0){
+            char* new_vers = to_Str(atoi(server_manifest[0]->version)+1);
+            write(new_manifest_file, new_vers, strlen(new_vers));
+            write(new_manifest_file, "\n", 1);
+        }
+        else{
+            if(server_manifest[x]== NULL){
+                x++;
+                continue;
+            }
+            write(new_manifest_file, server_manifest[x]->version, strlen(server_manifest[x]->version));
+            write(new_manifest_file, " ", 1);
+            write(new_manifest_file, server_manifest[x]->file, strlen(server_manifest[x]->file));
+            write(new_manifest_file, " ", 1);
+            write(new_manifest_file, server_manifest[x]->hash, strlen(server_manifest[x]->hash));
+            write(new_manifest_file, "\n", 1);
+        }
+        x++;
+    }
 
     /*tell the client that push was successful*/
-    block_write(clientSoc, "33:Server has successfully pushed.\0", 35);
+    block_write(clientSoc, "32:Server has successfully pushed.\0", 35);
 
 }
 
@@ -543,13 +519,8 @@ void create_commit_file(char* buffer, int clientSoc){
     }
 
     /*make commit file*/
-    char* pserver = (char*)malloc(8+strlen(project_name)+strlen("/.Commit"));
-    char server[10] = "./server/\0";
-    int k = 0;
-    while(k < 10){
-        pserver[k] = server[k];
-        k++;
-    }
+    char* pserver = (char*)malloc(strlen(project_name)+strlen("/.Commit"));
+    pserver[0]='\0';
     strcat(pserver, project_name); 
     strcat(pserver, "/.Commit");
     int commitFile = open(pserver, O_WRONLY | O_CREAT | O_TRUNC, 0775);
@@ -559,19 +530,20 @@ void create_commit_file(char* buffer, int clientSoc){
 
     /*write the commit file content to the file*/
     bcount += (strlen(project_name)+1);
-    int count = 0;
+    int count = bcount;
     while(buffer[count]!=':'){
         count++;
     }
-    char* size = getSubstring(bcount, buffer, count);
+    char* size = getSubstring(bcount, buffer, count-bcount);
     bcount += (strlen(size)+1);
-    char* file_content = (char*)malloc(atoi(size)+1*sizeof(char));
+    char* file_content = (char*)malloc(atoi(size)*sizeof(char));
     int i = 0;
     while(i < atoi(size)){
-        file_content[0] = buffer[bcount+i];
+        file_content[i] = buffer[bcount+i];
+        i++;
     }
-    file_content[strlen(size)+1] = '\0';
-    write(commitFile, file_content, atoi(size)+1);
+    file_content[atoi(size)] = '\0';
+    write(commitFile, file_content, atoi(size));
 
     /*tell client everything is good*/
     block_write(clientSoc, "33:Server has made the commit file.\0", 36);
@@ -638,15 +610,7 @@ void fetchServerManifest(char* buffer, int clientSoc){
     }
 
     /*Call method to write to the client socket.*/
-    char* pserver = (char*)malloc(10+strlen(project_name));
-    char server[10] = "./server/\0";
-    int k = 0;
-    while(k < 10){
-        pserver[k] = server[k];
-        k++;
-    }
-    strcat(pserver, project_name);
-    int s = send_manifest(pserver, clientSoc);
+    int s = send_manifest(project_name, clientSoc);
 
     /*More error checking*/
     if(s == -1){
@@ -654,10 +618,8 @@ void fetchServerManifest(char* buffer, int clientSoc){
     } else if(s == -2){
         printf("ERROR cannot find Manifest file./\n");
     }
-
-    free(pserver);
 }
-//===============================DESTROY======================
+//=============================== DESTROY ======================
 /*Returns 0 on success and -1 on fail on removing all files and directories given a path.*/
 int remove_directory(char* dirPath){
     int r = -1;
@@ -724,7 +686,42 @@ void destroyProject(char* buffer, int clientSoc){
     free(pserver);
 }
 
-//===============================CHECKOUT======================
+//=============================== CHECKOUT ======================
+/*Increments the global counter- cmd_count*/
+void inc_command_length(char* dirPath){
+    /*traverse the directory*/
+    char path[4096];
+    struct dirent *d;
+    DIR *dir = opendir(dirPath);
+    if (dir == NULL){
+        printf("ERROR opening directory.\n");
+        return;
+    } else {
+        cmd_count+= (digits(strlen(dirPath)));
+        cmd_count+= (strlen(dirPath));
+        cmd_count+= 4;
+    }
+    while ((d = readdir(dir)) != NULL) {
+        snprintf(path, 4096, "%s/%s", dirPath, d->d_name);        
+        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0) continue;
+        if (d->d_type != DT_DIR){
+            /*for a file*/
+            cmd_count+= (digits(strlen(path)));
+            cmd_count+= (strlen(path));
+            cmd_count+= 6;
+
+            /*for the file content*/
+            char* data_client = getFileContent(path, "C");
+            cmd_count+= (digits(strlen(data_client)));
+            cmd_count+= (strlen(data_client));
+            cmd_count+= 2;
+        }else{
+            inc_command_length(path);
+        }
+    }
+    closedir(dir);    
+}
+
 /*Returns an char** array that stores all the things to be concatenated together.*/
 char* checkoutProject(char* command, char* dirPath, int clientSoc){
     /*traverse the directory*/
@@ -735,16 +732,15 @@ char* checkoutProject(char* command, char* dirPath, int clientSoc){
         printf("ERROR opening directory.\n");
         return NULL;
     } else {
-        char* dirPath_client = change_to_client(dirPath);
         char f[2] = "P\0";
-        char* new_dirpath = (char*)malloc(strlen(dirPath_client)+2*sizeof(char));
-        check_malloc_null(dirPath_client);
+        char* new_dirpath = (char*)malloc(strlen(dirPath)+2*sizeof(char));
+        check_malloc_null(new_dirpath);
         int i = 0;
         while(i < 2){
             new_dirpath[i] = f[i];
             i++;
         }
-        strcat(new_dirpath, dirPath_client);
+        strcat(new_dirpath, dirPath);
         char* length_of_path = to_Str(strlen(new_dirpath));
         strcat(command,length_of_path);
         strcat(command, ":");
@@ -756,16 +752,15 @@ char* checkoutProject(char* command, char* dirPath, int clientSoc){
         if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0) continue;
         if (d->d_type != DT_DIR){
             /*for a file*/
-            char* path_client = change_to_client(path);
             char f[4] = "F./\0";
-            char* new_path = (char*)malloc(strlen(path_client)+4*sizeof(char));
+            char* new_path = (char*)malloc(strlen(path)+4*sizeof(char));
             check_malloc_null(new_path);
             int i = 0;
             while(i < 4){
                 new_path[i] = f[i];
                 i++;
             }
-            strcat(new_path, path_client);
+            strcat(new_path, path);
             char* length_of_path = to_Str(strlen(new_path));
             strcat(command, length_of_path);
             strcat(command, ":");
@@ -788,7 +783,7 @@ char* checkoutProject(char* command, char* dirPath, int clientSoc){
     return command;
 }
 
-//=============================CREATE===================================
+//============================= CREATE ===================================
 /*Create project folder.*/
 void createProject(char* buffer, int clientSoc){
     /*parse through the buffer*/
@@ -812,18 +807,11 @@ void createProject(char* buffer, int clientSoc){
         }
 
         /*make project folder and set permissions*/
-        char* pserver = (char*)malloc(8+strlen(project_name)+strlen("/.Manifest"));
-        char server[8] = "server/\0";
-        int k = 0;
-        while(k < 8){
-            pserver[k] = server[k];
-            k++;
-        }
+        char* pserver = (char*)malloc(strlen(project_name)+strlen("/.Manifest"));
+        pserver[0] = '\0';
         strcat(pserver, project_name); 
         mkdir_recursive(pserver);
-        int ch = chmod("./server", 0775);
-        if(ch<0) printf("ERROR set permission error.\n");
-        ch = chmod(pserver, 0775);
+        int ch = chmod(pserver, 0775);
         if(ch<0) printf("ERROR set permission error.\n");
 
         /*make manifest file*/
@@ -841,20 +829,14 @@ void createProject(char* buffer, int clientSoc){
             return;
         }
     }
-    /*send string to client to make project*/    
-    char* pserver = (char*)malloc(8+strlen(project_name));
-    char server[8] = "server/\0";
-    int k = 0;
-    while(k < 8){
-        pserver[k] = server[k];
-        k++;
-    }
-    strcat(pserver, project_name);
-    char* command = (char*)malloc(max_arr_size*sizeof(char));
+    /*send string to client to make project*/   
+    cmd_count+=(strlen(cmd)+1);
+    inc_command_length(project_name);
+    char* command = (char*)malloc(cmd_count*sizeof(char));
     command[0] = '\0';
     strcat(command, cmd);
     strcat(command, ":");
-    command = checkoutProject(command, pserver, clientSoc);
+    command = checkoutProject(command, project_name, clientSoc);
 
     /*add the length of the full commmand to the front of the protocol*/
     int cmd_length = strlen(command);
@@ -868,13 +850,14 @@ void createProject(char* buffer, int clientSoc){
     /*write command to client*/
     int n = write(clientSoc, new_command, strlen(new_command));
     if(n < 0) printf("ERROR writing to the client.\n");
+    else printf("Success writing to the client.\n");
 
     /*free stuff*/
     free(command);
     free(new_command);
 }
 
-//===============================READ CLIENT MESSAGE======================
+//=============================== READ CLIENT MESSAGE ======================
 /*Parse through the client command.*/
 void parseRead(char* buffer, int clientSoc){
     if(strstr(buffer, ":")!=0){
@@ -895,6 +878,13 @@ void parseRead(char* buffer, int clientSoc){
         else if(strcmp(command, "push")==0){
             push_commits(buffer, clientSoc);
         }
+        else if(strcmp(command, "rollback")==0){
+            rollback(buffer, clientSoc);
+        }
+        else if(strcmp(command, "currentversion")==0){
+            char* current_version = get_current_version(buffer, clientSoc);
+            int n = write(clientSoc, current_version, strlen(current_version));
+        }
         else {
             printf("Have not implemented this command yet!\n");
         }
@@ -902,11 +892,11 @@ void parseRead(char* buffer, int clientSoc){
     }
 }
 
-//============================NETWORKING==================================
+//============================ NETWORKING ==================================
 /* blocking read */
 char* block_read(int fd, int targetBytes){
-    char* buffer = (char*) malloc(sizeof(char)*256);
-    bzero(buffer,256);
+    char* buffer = (char*) malloc(sizeof(char)*targetBytes);
+    bzero(buffer,targetBytes);
     int status = 0;    
     int readIn = 0;
     do{
@@ -976,7 +966,7 @@ int set_up_connection(char* port){
     // printf("%d", len);
     char* buffer =  block_read(clientSoc, len);
     printf("%s\n",buffer);
-    block_write(clientSoc,"44:Client successfully connected to Server!\0",44);
+    block_write(clientSoc,"41:Client successfully connected to Server!\0",44);
 
     free(buffer);
     return clientSoc;

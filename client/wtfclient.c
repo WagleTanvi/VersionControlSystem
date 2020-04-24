@@ -13,40 +13,12 @@
 #include <time.h>
 #include <libgen.h>
 #include <openssl/sha.h>
-
-/*So.. idk if you like this formatting method but basically it goes
-
-helper
-free
-printing
-hashing
-records
-commit
-upgrade
-update
-add/remove
-create
-socket/networking
-main
-
-i kind of tried to follow the way of the asst.pdf
-
-*/
-
-typedef struct Record{
-    char* version; //for manifest it is the version number, for upgrade and push it is the command 'M','A', or 'D'
-    char* file; //file path (includes the project name)
-    unsigned char* hash;
-} Record;
-
-typedef enum Boolean{
-    true = 1,
-    false = 0
-} Boolean;
+#include "record.h"
 
 //================== PROTOTYPES===========================================
 
 void block_write(int fd, char *data, int targetBytes);
+
 //==================== HELPER METHODS ================================
 /*Count digits in a number*/
 int digits(int n)
@@ -133,7 +105,6 @@ void mkdir_recursive(const char *path){
             printf("ERROR unable to make directory: %s\n", strerror(errno));
         }
     }
-    free(fullpath);
 }
 
 /* Returns true if file exists in project */
@@ -258,7 +229,6 @@ void print_2d_arr(char** arr, int size){
 //========================HASHING===================================================
 unsigned char* getHash(char* s){
 	unsigned char *d = SHA256(s, strlen(s), 0);
- 
 	int i;
 	for (i = 0; i < SHA256_DIGEST_LENGTH; i++)
 		printf("%02x", d[i]);
@@ -271,13 +241,7 @@ char** getLiveHashes(Record** record_arr, int size){
     char** live_hash_arr = (char**)malloc(size*sizeof(char*));
     int i = 1;
     while(i < size){
-        char* file_path = (char*)malloc(10+strlen(record_arr[i]->file) * sizeof(char));
-        char client[10] = "./client/\0";
-        int k = 0;
-        while(k < 10){
-            file_path[k] = client[k];
-            k++;
-        }
+        char* file_path = (char*)malloc(strlen(record_arr[i]->file) * sizeof(char));
         strcat(file_path, record_arr[i]->file);
         char* file_content = read_file(file_path);
         char* live_hash =  getHash(file_content);
@@ -287,142 +251,12 @@ char** getLiveHashes(Record** record_arr, int size){
     return live_hash_arr;
 }
 
-// =======================  RECORD METHODS =====================================================
-/* Returns number of lines in file */
-int number_of_lines(char *fileData)
-{
-    int count = 0;
-    int pos = 0;
-    while (pos < strlen(fileData))
-    {
-        if (fileData[pos] == '\n')
-        {
-            count++;
-        }
-        pos++;
-    }
-    return count;
-}
-
-/* Parses one line of the Record and addes to stuct */
-void add_to_struct(char* line, Record** record_arr, int recordCount){
-    int start = 0;
-    int pos = 0;
-    int count = 0;
-    Record* record = (Record*) malloc(sizeof(Record));
-    while (pos < strlen(line)){
-        if (line[pos] == ' ' || line[pos] == '\n'){
-            int len = pos - start;
-            char *temp = (char *)malloc(sizeof(char) * len + 1);
-            temp[0] = '\0';
-            strncpy(temp, &line[start], len);
-            temp[len] = '\0';
-            switch (count){
-                case 0:
-                    record->version = temp;
-                    break;
-                case 1:
-                    record->file = temp;
-                    break;
-                case 2:
-                    record->hash = temp;
-                    count = -1;
-                    break;
-            }
-            count++;
-            start = pos+1;
-        }
-        pos++;
-    }
-    record_arr[recordCount] = record;
-}
-
-/* Returns an array of records */
-Record** create_record_struct(char* fileData){
-    int start = 0;
-    Boolean version = false;
-    int pos = 0;
-    int numberOfRecords = number_of_lines(fileData);
-    Record** record_arr = (Record**) malloc(sizeof(Record*)*numberOfRecords);
-    int recordCount = 0;
-    while (pos < strlen(fileData))
-    {
-        if (fileData[pos] == '\n')
-        {
-            int len = pos - start;
-            char *temp = (char *)malloc(sizeof(char) * len + 2);
-            temp[0] = '\0';
-            strncpy(temp, &fileData[start], len+1);
-            temp[len+1] = '\0';
-            if (version){ // if version number has already been seen
-                add_to_struct(temp, record_arr, recordCount);
-                start = pos+1;
-                recordCount++;
-                free(temp);
-            }
-            else{
-                Record* record = (Record*) malloc(sizeof(Record));
-                char* rec_count = (char*) malloc(sizeof(char)*50);
-                sprintf(rec_count, "%d", numberOfRecords);
-                record->version = temp;
-                record->file = NULL;
-                record->hash = rec_count; //the hash stores the number of records!
-                record_arr[recordCount] = record;
-                version = true;
-                start = pos + 1;
-                recordCount++;
-            }
-        }
-        pos++;
-    }
-    return record_arr;
-}
-
-/* Returns size of record array which is stored in the first position of the array hash value */
-int getRecordStructSize(Record** record_arr){
-    return atoi(record_arr[0]->hash);
-}
-/* Look in the records for a particular file name formatted as project/filepath */
-Boolean search_Record(Record** record_arr, char* targetFile){
-    int x = 1;
-    int size = getRecordStructSize(record_arr);
-    while ( x < size){
-        if (strcmp(record_arr[x]->file, targetFile) == 0){
-            return true;
-        }
-        x++;
-    }
-    return false;
-}
-
-char* search_record_hash(Record** record_arr, char* targetFile){
-    int x = 1;
-    int size = getRecordStructSize(record_arr);
-    while ( x < size){
-        if (strcmp(record_arr[x]->file, targetFile) == 0){
-            return record_arr[x]->hash;
-        }
-        x++;
-    }
-    return NULL;
-}
-
 //=================================== COMMIT ===================================
-
-char* append_client(int size){
-    char* pclient = (char*)malloc(size * sizeof(char));
-    char client[10] = "./client/\0";
-    int k = 0;
-    while(k < 10){
-        pclient[k] = client[k];
-        k++;
-    }
-}
 
 /*Sends the commit file to the server.*/
 void write_commit_file(int sockfd, char* project_name, char* server_record_data){
     //first check if the client has updates to be made
-    char* pclient = append_client(10+strlen(project_name)+strlen("./Update"));
+    char* pclient = (char*)malloc(strlen(project_name)+strlen("./Update")*sizeof(char));
     strcat(pclient, project_name);
     strcat(pclient, "/.Update");
     if(fileExists(pclient)==true){
@@ -435,7 +269,7 @@ void write_commit_file(int sockfd, char* project_name, char* server_record_data)
     // free(pclient);
 
     /*check if there is a conflict file*/
-    char* pclient2 = append_client(10+strlen(project_name)+strlen("./Conflict"));
+    char* pclient2 = (char*)malloc(strlen(project_name)+strlen("./Conflict")*sizeof(char));
     strcat(pclient2, project_name);
     strcat(pclient2, "/.Conflict");
     if(fileExists(pclient2)==true){
@@ -445,8 +279,8 @@ void write_commit_file(int sockfd, char* project_name, char* server_record_data)
     }
     // free(pclient2);
 
-    // /*get server and client records*/
-    char* pclient3 = append_client(10+strlen(project_name)+strlen("./Manifest"));
+    // /*get server and client manifests*/
+    char* pclient3 = (char*)malloc(strlen(project_name)+strlen("./Manifest")*sizeof(char));
     strcat(pclient3, project_name);
     strcat(pclient3, "/.Manifest");
     Record** server_manifest = create_record_struct(server_record_data);
@@ -482,11 +316,9 @@ void write_commit_file(int sockfd, char* project_name, char* server_record_data)
     char** live_hash_arr = getLiveHashes(client_manifest, client_manifest_size);
 
     /*create path for commit*/
-    char* pclient4 = append_client(10+strlen(project_name));
-    strcat(pclient4, project_name);
-    int path_len = strlen("./Commit")+strlen(pclient4);
+    int path_len = strlen("./Commit")+strlen(project_name);
     char* commit_path = (char*)malloc(path_len+1*sizeof(char));
-    snprintf(commit_path, path_len+1, "%s%s", pclient4, "/.Commit");
+    snprintf(commit_path, path_len+1, "%s%s", project_name, "/.Commit");
     commit_path[path_len+1] = '\0'; 
     int commit_fd = open(commit_path, O_WRONLY | O_CREAT | O_TRUNC, 00600);
 
@@ -529,6 +361,9 @@ void write_commit_file(int sockfd, char* project_name, char* server_record_data)
             write(commit_fd, " ", 1);
             write(commit_fd, client_manifest[i]->hash, strlen(client_manifest[i]->hash));
             write(commit_fd, "\n", 1);
+            /*increment the file version*/
+            int client_file_version = atoi(client_manifest[i]->version);
+            client_manifest[i]->version = to_Str(client_file_version+1);   
         }
         i++;
     }
@@ -565,13 +400,15 @@ void write_commit_file(int sockfd, char* project_name, char* server_record_data)
     extended_commit_cmd[0] = '\0';
     strcat(extended_commit_cmd, to_Str(strlen(send_commit_to_server)+1));
     strcat(extended_commit_cmd, ":");
-    block_write(sockfd, extended_commit_cmd, strlen(extended_commit_cmd));
+    strcat(extended_commit_cmd, send_commit_to_server);
+    int w = write(sockfd, extended_commit_cmd, strlen(extended_commit_cmd));
+    if(w < 0) printf("ERROR writing to the server.\n");
 
     /*Finally free!*/
-    free(commit_path);
-    freeRecord(server_manifest);
-    freeRecord(client_manifest);
-    free_string_arr(live_hash_arr, client_manifest_size);
+    // free(commit_path);
+    // freeRecord(server_manifest);
+    // freeRecord(client_manifest);
+    // free_string_arr(live_hash_arr, client_manifest_size);
 }
 
 //=========================== UPGRADE METHODS==================================================================
@@ -779,10 +616,7 @@ void parseBuffer_create(char* buffer){
             if(tok[0] == 'P'){
                 char* projectName = substr(tok, 1, strlen(tok));
                 mkdir_recursive(projectName);
-                int ch = chmod("./client", 0775);
-                if (ch < 0)
-                    printf("ERROR setting perrmissions.\n");
-                ch = chmod(projectName, 0775);
+                int ch = chmod(projectName, 0775);
                 if (ch < 0)
                     printf("ERROR setting perrmissions: %s.\n", strerror(errno));
             }
@@ -808,7 +642,6 @@ void parseBuffer_create(char* buffer){
         bcount += strlen(tok);
         bcount++; //this is for the semicolon
     }
-    free(tok);
 }
 
 //=========================== SOCKET/CONFIGURE METHODS==================================================================
@@ -829,8 +662,8 @@ void delay(int number_of_seconds)
 /* blocking read */
 char *block_read(int fd, int targetBytes)
 {
-    char *buffer = (char *)malloc(sizeof(char) * 256);
-    bzero(buffer, 256);
+    char *buffer = (char *)malloc(sizeof(char) * targetBytes);
+    bzero(buffer, targetBytes);
     int status = 0;
     int readIn = 0;
     do
@@ -873,7 +706,7 @@ int read_len_message(int fd)
     num[strlen(buffer)] = '\0';
     free(buffer);
     //printf("%s", num);
-    int len = atoi(num)-strlen(num);
+    int len = atoi(num);
     free(num);
     return len;
 }
@@ -968,6 +801,7 @@ int write_to_server(int sockfd, char* argv1, char* argv2, char* project_name){
     int clen = strlen(argv2)+digits(strlen(project_name))+strlen(argv1)+2;
     char* command = (char*)malloc(clen+1*sizeof(char)); 
     snprintf(command, clen+1, "%s:%d:%s", argv1, strlen(project_name), argv2);
+    
     char* new_command = (char*)malloc(strlen(command)+digits(strlen(command))+1 * sizeof(char));
     new_command[0] = '\0';
     strcat(new_command, to_Str((strlen(command))));
@@ -1008,7 +842,7 @@ int main(int argc, char **argv)
             parseBuffer_create(buffer);
         }
         /*disconnect server at the end!*/
-        block_write(sockfd, "Done", 4);
+        block_write(sockfd, "5:Done\0", 7);
         printf("Client Disconnecting");
         close(sockfd);
     }
@@ -1023,7 +857,7 @@ int main(int argc, char **argv)
             char *buffer = read_from_server(sockfd);
         }
         /*disconnect server at the end!*/
-        block_write(sockfd, "Done", 4);
+        block_write(sockfd, "5:Done", 4);
         printf("Client Disconnecting");
         close(sockfd);
     }
@@ -1080,28 +914,43 @@ int main(int argc, char **argv)
         strcat(commit_file, "/.Commit");
         char* commitfile_content = read_file(commit_file);
 
+        /*Get the data from the manifest file*/
+        char* manifest_file = (char*)malloc(strlen(argv[2])+strlen("/.Manifest"));
+        manifest_file[0]='\0';
+        strcat(manifest_file, argv[2]); 
+        strcat(manifest_file, "/.Manifest");
+        char* manifest_file_content = read_file(manifest_file);
+
         /*attach everything*/
-        char* sec_cmd = (char*)malloc(strlen(argv[2])+1+digits(strlen(commitfile_content))+1+strlen(commitfile_content));
+        char* sec_cmd = (char*)malloc(strlen(argv[2])+1+digits(strlen(commitfile_content))+1+strlen(commitfile_content)+1+digits(strlen(manifest_file_content))+1+strlen(manifest_file_content));
         sec_cmd[0] = '\0';
         strcat(sec_cmd, argv[2]);
         strcat(sec_cmd, ":");
         strcat(sec_cmd, to_Str(strlen(commitfile_content)));
         strcat(sec_cmd, ":");
         strcat(sec_cmd, commitfile_content);
+        strcat(sec_cmd, ":");
+        strcat(sec_cmd, to_Str(strlen(manifest_file_content)));
+        strcat(sec_cmd, ":");
+        strcat(sec_cmd, manifest_file_content);
 
         int n = write_to_server(sockfd, argv[1], sec_cmd, argv[2]);
         if(n < 0)
             printf("ERROR writing to socket.\n");
         else{
-            char* buffer = read_from_server(sockfd);
-        } 
+            char* buffer = read_from_server(sockfd); 
+        }
+    }
+    else if(argc == 3 && (strcmp(argv[1], "rollback")==0)){
+    }
+    else if(argc == 3 && (strcmp(argv[1], "currentversion")==0)){
     }
     else {
         printf("Fatal Error: Invalid Arguments\n");
     }
     /*disconnect server at the end!*/
-    // int n = write(sockfd, "Done", 4);
-    // if(n < 0) printf("ERROR reading to socket.\n");
+    int n = write(sockfd, "Done", 4);
+    if(n < 0) printf("ERROR reading to socket.\n");
 
     // sockfd = read_configure_and_connect();
     // code to disconnect let server socket know client socket is disconnecting
