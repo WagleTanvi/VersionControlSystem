@@ -4,7 +4,6 @@ a.out
 .configure
 client/t
 server/t
-.nfs00000000046836d90000d935
-.nfs00000000046836d90000d9c2
-.nfs00000000046836d90000db86
-server/.nfs00000000046836db0000db87
+.nfs*
+server/.nfs*
+client/.nfs*
