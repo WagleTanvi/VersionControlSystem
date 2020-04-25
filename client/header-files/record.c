@@ -1,18 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <dirent.h>
-#include <ctype.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <time.h>
-#include <libgen.h>
-#include <openssl/sha.h>
+#include "helper.h"
 #include "record.h"
 
 /* Returns number of lines in file */
@@ -132,4 +118,41 @@ char* search_record_hash(Record** record_arr, char* targetFile){
         x++;
     }
     return NULL;
+}
+
+/* Formats one record */
+char* printRecord(Record* record){
+    int len;
+    if (record == NULL){
+        return NULL;
+    }
+    else{
+        int len = strlen(record->version)+strlen(record->file)+strlen(record->hash) + 1 + 3;
+        char* line = (char*) malloc(sizeof(char)*len);
+        line[0] = '\0';
+        strcat(line, record->version);
+        strcat(line, " ");
+        strcat(line, " ");
+        strcat(line,record->file );
+        strcat(line, " ");
+        strcat(line,record->hash );
+        return line;
+    }
+}
+
+/* Free Record Array */
+void freeRecord(Record** record_arr){
+    int size = getRecordStructSize(record_arr);
+    free(record_arr[0]->version);
+    free(record_arr[0]->hash);
+    free(record_arr[0]);
+    int x = 1;
+    while (x < size){
+        free(record_arr[x]->version);
+        free(record_arr[x]->file);
+        free(record_arr[x]->hash);
+        free(record_arr[x]);
+        x++;
+    }
+    free(record_arr);
 }

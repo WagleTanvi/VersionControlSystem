@@ -1,17 +1,6 @@
 #ifndef RECORD_H
 #define RECORD_H
 
-typedef struct Record{
-    char* version; //for manifest it is the version number, for upgrade and push it is the command 'M','A', or 'D'
-    char* file; //file path (includes the project name)
-    unsigned char* hash;
-} Record;
-
-typedef enum Boolean{
-    true = 1,
-    false = 0
-} Boolean;
-
 /* Returns number of lines in file */
 int number_of_lines(char *fileData);
 
@@ -29,5 +18,11 @@ Boolean search_Record(Record** record_arr, char* targetFile);
 
 /* Returns the hash in the records */
 char* search_record_hash(Record** record_arr, char* targetFile);
+
+/* Formats one record */
+char* printRecord(Record* record);
+
+/* Free Record Array */
+void freeRecord(Record** record_arr);
 
 #endif
