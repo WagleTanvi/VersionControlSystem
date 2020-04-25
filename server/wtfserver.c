@@ -321,20 +321,23 @@ void push_commits(char* buffer, int clientSoc){
 }
 
 //=============================== COMMIT ======================
-void create_commit_file(char* buffer, int clientSoc){
+void create_commit_file(char *buffer, int clientSoc)
+{
     /*get project name and check if the project exists in the server*/
     int bcount = 0;
-    char* cmd = strtok(buffer, ":");
-    bcount += strlen(cmd)+1;
-    char* plens = strtok(NULL, ":");
-    bcount += strlen(plens)+1;
+    char *cmd = strtok(buffer, ":");
+    bcount += strlen(cmd) + 1;
+    char *plens = strtok(NULL, ":");
+    bcount += strlen(plens) + 1;
     int pleni = atoi(plens);
-    char* project_name = getSubstring(bcount, buffer, pleni);
+    char *project_name = getSubstring(bcount, buffer, pleni);
     int foundProj = search_proj_exists(project_name);
-    if(foundProj==0){
+    if (foundProj == 0)
+    {
         free(project_name);
         int n = write(clientSoc, "ERROR project not in the server.\n", 36);
-        if(n < 0) printf("ERROR writing to the client.\n");
+        if (n < 0)
+            printf("ERROR writing to the client.\n");
         return;
     }
 
@@ -344,7 +347,8 @@ void create_commit_file(char* buffer, int clientSoc){
     strcat(pserver, project_name); 
     strcat(pserver, "/.Commit");
     int commitFile = open(pserver, O_WRONLY | O_CREAT | O_TRUNC, 0775);
-    if(commitFile < 0){
+    if (commitFile < 0)
+    {
         printf("ERROR unable to make manifestFile: %s\n", strerror(errno));
     }
 
@@ -371,37 +375,56 @@ void create_commit_file(char* buffer, int clientSoc){
 
 //===============================GET MANIFEST======================
 /*Sends the contents of the manifest to the client.*/
-int send_manifest(char* project_name, int clientSoc){    
+int send_manifest(char *project_name, int clientSoc)
+{
+    printf("Sending Manifest to client\n");
     char path[4096];
     struct dirent *d;
     DIR *dir = opendir(project_name);
-    if (dir == NULL){
+    if (dir == NULL)
+    {
         return -1;
     }
-    while ((d = readdir(dir)) != NULL) {
-        snprintf(path, 4096, "%s/%s", project_name, d->d_name);        
-        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0) continue;
-        if (d->d_type == DT_DIR){
+    while ((d = readdir(dir)) != NULL)
+    {
+        snprintf(path, 4096, "%s/%s", project_name, d->d_name);
+        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0)
+            continue;
+        if (d->d_type == DT_DIR)
+        {
             int result = send_manifest(path, clientSoc);
-        }else{
-            if(strcmp(d->d_name, ".Manifest")==0){
+        }
+        else
+        {
+            if (strcmp(d->d_name, ".Manifest") == 0)
+            {
                 /*add the length of the full commmand to the front of the protocol*/
-                char* manifest_data = getFileContent(path, "");
+                char *manifest_data = getFileContent(path, "");
+                //printf("%s\n", manifest_data);
                 int m_len = strlen(manifest_data);
-                char* m_len_str = to_Str(m_len);
-                char* new_mdata = (char*)malloc(m_len+strlen(m_len_str)+1*sizeof(char));
+                char *m_len_str = to_Str(m_len);
+                char *new_mdata = (char *)malloc(m_len + strlen(m_len_str) + 2 * sizeof(char));
                 new_mdata[0] = '\0';
                 strcat(new_mdata, m_len_str);
                 strcat(new_mdata, ":");
                 strcat(new_mdata, manifest_data);
-
+                //printf("%s\n", new_mdata);
                 /*write to the client*/
                 int n = write(clientSoc, new_mdata, strlen(new_mdata));
-                if(n < 0){
+                free(m_len_str);
+                free(manifest_data);
+                free(new_mdata);
+                if (n < 0)
+                {
                     printf("ERROR writing to client.\n");
+                    closedir(dir);
                     return -1;
                 }
-                else return 0;
+                else
+                {
+                    closedir(dir);
+                    return 0;
+                }
             }
         }
     }
@@ -410,22 +433,25 @@ int send_manifest(char* project_name, int clientSoc){
 }
 
 /*Gets the project manifest that exists on server side.*/
-void fetchServerManifest(char* buffer, int clientSoc){
+void fetchServerManifest(char *buffer, int clientSoc)
+{
     /*parse through the buffer*/
     int bcount = 0;
-    char* cmd = strtok(buffer, ":");
-    bcount += strlen(cmd)+1;
-    char* plens = strtok(NULL, ":");
-    bcount += strlen(plens)+1;
+    char *cmd = strtok(buffer, ":");
+    bcount += strlen(cmd) + 1;
+    char *plens = strtok(NULL, ":");
+    bcount += strlen(plens) + 1;
     int pleni = atoi(plens);
-    char* project_name = getSubstring(bcount, buffer, pleni);
+    char *project_name = getSubstring(bcount, buffer, pleni);
     int foundProj = search_proj_exists(project_name);
 
     /*Error checking*/
-    if(foundProj==0){
+    if (foundProj == 0)
+    {
         free(project_name);
-        int n = write(clientSoc, "ERROR the project does not exist on server.\n", 40);
-        if(n < 0) printf("ERROR writing to the client.\n");
+        int n = write(clientSoc, "44:ERROR the project does not exist on server.\n", 40);
+        if (n < 0)
+            printf("ERROR writing to the client.\n");
         return;
     }
 
@@ -433,31 +459,93 @@ void fetchServerManifest(char* buffer, int clientSoc){
     int s = send_manifest(project_name, clientSoc);
 
     /*More error checking*/
-    if(s == -1){
+    if (s == -1)
+    {
         printf("ERROR sending Manifest to client./\n");
-    } else if(s == -2){
+    }
+    else if (s == -2)
+    {
         printf("ERROR cannot find Manifest file./\n");
     }
+    free(project_name);
+    //free(pserver);
+}
+/* Returns true if file exists in project */
+Boolean fileExists(char *fileName)
+{
+    DIR *dir = opendir(fileName);
+    if (dir != NULL)
+    {
+        closedir(dir);
+        return false;
+    }
+    closedir(dir);
+    int fd = open(fileName, O_RDONLY);
+    if (fd == -1)
+    {
+        //printf("Fatal Error: %s named %s\n", strerror(errno), file);
+        //close(fd);
+        return false;
+    }
+    close(fd);
+    return true;
+}
+void fetchFile(char *buffer, int clientSoc, char *command)
+{
+    printf("Sending File to client\n");
+    char *cmd = strtok(buffer, ":");
+    char *plens = strtok(NULL, ":");
+    char *file_name = strtok(NULL, ":");
+    printf("%s", file_name);
+    int foundFile = fileExists(file_name);
+    if (!foundFile)
+    {
+        free(file_name);
+        int n = write(clientSoc, "40:ERROR the file does not exist on server.\n", 40);
+        if (n < 0)
+            printf("ERROR writing to the client.\n");
+        return;
+    }
+    char *content = getFileContent(file_name, "");
+    int contentLen = strlen(content);
+    int digLen = digits(contentLen);
+    int totalLen = digLen + contentLen + 1;
+    char *send = (char *)malloc(sizeof(char *) * totalLen + 1);
+    send[0] = '\0';
+    char *messageLen = to_Str(contentLen);
+    strcat(send, messageLen);
+    strcat(send, ":");
+    strcat(send, content);
+    printf("%s\n", content);
+    printf("%s\n", send);
+    block_write(clientSoc, send, totalLen);
 }
 //=============================== DESTROY ======================
 /*Returns 0 on success and -1 on fail on removing all files and directories given a path.*/
-int remove_directory(char* dirPath){
+int remove_directory(char *dirPath)
+{
     int r = -1;
     char path[4096];
     struct dirent *d;
     DIR *dir = opendir(dirPath);
-    if (dir == NULL){
+    if (dir == NULL)
+    {
         printf("ERROR this is not a directory.\n");
         return -1;
     }
-    r=0;
-    while (!r && (d = readdir(dir)) != NULL) {
+    r = 0;
+    while (!r && (d = readdir(dir)) != NULL)
+    {
         int r2 = -1;
-        snprintf(path, 4096, "%s/%s", dirPath, d->d_name);        
-        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0) continue;
-        if (d->d_type == DT_DIR){
+        snprintf(path, 4096, "%s/%s", dirPath, d->d_name);
+        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0)
+            continue;
+        if (d->d_type == DT_DIR)
+        {
             r2 = remove_directory(path);
-        }else{
+        }
+        else
+        {
             r2 = unlink(path);
         }
         r = r2;
@@ -466,25 +554,28 @@ int remove_directory(char* dirPath){
     if (r==0){
        r = rmdir(dirPath);
     }
-    return 0;  
+    return 0;
 }
 
 /*Remove a project from the server side.*/
-void destroyProject(char* buffer, int clientSoc){
+void destroyProject(char *buffer, int clientSoc)
+{
     int bcount = 0;
-    char* cmd = strtok(buffer, ":");
-    bcount += strlen(cmd)+1;
-    char* plens = strtok(NULL, ":"); // "12"
-    bcount += strlen(plens)+1;
+    char *cmd = strtok(buffer, ":");
+    bcount += strlen(cmd) + 1;
+    char *plens = strtok(NULL, ":"); // "12"
+    bcount += strlen(plens) + 1;
     int pleni = atoi(plens); //12
-    char* project_name = getSubstring(bcount, buffer, pleni);
+    char *project_name = getSubstring(bcount, buffer, pleni);
     int foundProj = search_proj_exists(project_name);
-    
+
     /*Error checking*/
-    if(foundProj==0){
+    if (foundProj == 0)
+    {
         free(project_name);
         int n = write(clientSoc, "ERROR the project does not exist on server.\n", 40);
-        if(n < 0) printf("ERROR writing to the client.\n");
+        if (n < 0)
+            printf("ERROR writing to the client.\n");
         return;
     }
 
@@ -495,11 +586,14 @@ void destroyProject(char* buffer, int clientSoc){
     int r = remove_directory(pserver);
 
     /*Send message to client*/
-    if(r<0) printf("ERROR traversing directory.\n");
-    else {
+    if (r < 0)
+        printf("ERROR traversing directory.\n");
+    else
+    {
         free(project_name);
         int n = write(clientSoc, "Successfully destroyed project.\n", 33);
-        if(n < 0) printf("ERROR writing to the client.\n");
+        if (n < 0)
+            printf("ERROR writing to the client.\n");
         return;
     }
 
@@ -543,12 +637,14 @@ void inc_command_length(char* dirPath){
 }
 
 /*Returns an char** array that stores all the things to be concatenated together.*/
-char* checkoutProject(char* command, char* dirPath, int clientSoc){
+char *checkoutProject(char *command, char *dirPath, int clientSoc)
+{
     /*traverse the directory*/
     char path[4096];
     struct dirent *d;
     DIR *dir = opendir(dirPath);
-    if (dir == NULL){
+    if (dir == NULL)
+    {
         printf("ERROR opening directory.\n");
         return NULL;
     } else {
@@ -556,7 +652,8 @@ char* checkoutProject(char* command, char* dirPath, int clientSoc){
         char* new_dirpath = (char*)malloc(strlen(dirPath)+2*sizeof(char));
         check_malloc_null(new_dirpath);
         int i = 0;
-        while(i < 2){
+        while (i < 2)
+        {
             new_dirpath[i] = f[i];
             i++;
         }
@@ -567,16 +664,20 @@ char* checkoutProject(char* command, char* dirPath, int clientSoc){
         strcat(command, new_dirpath);
         strcat(command, ":");
     }
-    while ((d = readdir(dir)) != NULL) {
-        snprintf(path, 4096, "%s/%s", dirPath, d->d_name);        
-        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0) continue;
-        if (d->d_type != DT_DIR){
+    while ((d = readdir(dir)) != NULL)
+    {
+        snprintf(path, 4096, "%s/%s", dirPath, d->d_name);
+        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0)
+            continue;
+        if (d->d_type != DT_DIR)
+        {
             /*for a file*/
             char f[4] = "F./\0";
             char* new_path = (char*)malloc(strlen(path)+4*sizeof(char));
             check_malloc_null(new_path);
             int i = 0;
-            while(i < 4){
+            while (i < 4)
+            {
                 new_path[i] = f[i];
                 i++;
             }
@@ -588,13 +689,15 @@ char* checkoutProject(char* command, char* dirPath, int clientSoc){
             strcat(command, ":");
 
             /*for the file content*/
-            char* data_client = getFileContent(path, "C");
-            char* length_of_data = to_Str(strlen(data_client));
+            char *data_client = getFileContent(path, "C");
+            char *length_of_data = to_Str(strlen(data_client));
             strcat(command, length_of_data);
             strcat(command, ":");
             strcat(command, data_client);
             strcat(command, ":");
-        }else{
+        }
+        else
+        {
             command = checkoutProject(command, path, clientSoc);
         }
     }
@@ -605,24 +708,28 @@ char* checkoutProject(char* command, char* dirPath, int clientSoc){
 
 //============================= CREATE ===================================
 /*Create project folder.*/
-void createProject(char* buffer, int clientSoc){
+void createProject(char *buffer, int clientSoc)
+{
     /*parse through the buffer*/
     int bcount = 0;
-    char* cmd = strtok(buffer, ":");
-    bcount += strlen(cmd)+1;
-    char* plens = strtok(NULL, ":");
-    bcount += strlen(plens)+1;
+    char *cmd = strtok(buffer, ":");
+    bcount += strlen(cmd) + 1;
+    char *plens = strtok(NULL, ":");
+    bcount += strlen(plens) + 1;
     int pleni = atoi(plens);
-    char* project_name = getSubstring(bcount, buffer, pleni);
+    char *project_name = getSubstring(bcount, buffer, pleni);
     int foundProj = search_proj_exists(project_name);
 
     /*create project in server*/
-    if(strcmp(cmd, "create")==0){
+    if (strcmp(cmd, "create") == 0)
+    {
         /*check to see if project already exists on server*/
-        if(foundProj==1){
+        if (foundProj == 1)
+        {
             free(project_name);
             int n = write(clientSoc, "ERROR the project already exists on server.\n", 30);
-            if(n < 0) printf("ERROR writing to the client.\n");
+            if (n < 0)
+                printf("ERROR writing to the client.\n");
             return;
         }
 
@@ -637,15 +744,19 @@ void createProject(char* buffer, int clientSoc){
         /*make manifest file*/
         strcat(pserver, "/.Manifest");
         int manifestFile = open(pserver, O_WRONLY | O_CREAT | O_TRUNC, 0775);
-        if(manifestFile < 0){
+        if (manifestFile < 0)
+        {
             printf("ERROR unable to make manifestFile: %s\n", strerror(errno));
         }
-    } 
-    else if(strcmp(cmd, "checkout")== 0){
-        if(foundProj==0){
+    }
+    else if (strcmp(cmd, "checkout") == 0)
+    {
+        if (foundProj == 0)
+        {
             free(project_name);
             int n = write(clientSoc, "ERROR project not in the server.\n", 36);
-            if(n < 0) printf("ERROR writing to the client.\n");
+            if (n < 0)
+                printf("ERROR writing to the client.\n");
             return;
         }
     }
@@ -660,8 +771,8 @@ void createProject(char* buffer, int clientSoc){
 
     /*add the length of the full commmand to the front of the protocol*/
     int cmd_length = strlen(command);
-    char* cmd_len_str = to_Str(cmd_length);
-    char* new_command = (char*)malloc(strlen(cmd_len_str)+cmd_length+1*sizeof(char));
+    char *cmd_len_str = to_Str(cmd_length);
+    char *new_command = (char *)malloc(strlen(cmd_len_str) + cmd_length + 1 * sizeof(char));
     new_command[0] = '\0';
     strcat(new_command, cmd_len_str);
     strcat(new_command, ":");
@@ -679,20 +790,27 @@ void createProject(char* buffer, int clientSoc){
 
 //=============================== READ CLIENT MESSAGE ======================
 /*Parse through the client command.*/
-void parseRead(char* buffer, int clientSoc){
-    if(strstr(buffer, ":")!=0){
+void parseRead(char *buffer, int clientSoc)
+{
+    if (strstr(buffer, ":") != 0)
+    {
         //figure out the command
-        char* command = getCommand(buffer);
-        if(strcmp(command, "create")==0 || strcmp(command, "checkout")==0){
+        char *command = getCommand(buffer);
+        //printf("Command: %s\n", command);
+        if (strcmp(command, "create") == 0 || strcmp(command, "checkout") == 0)
+        {
             createProject(buffer, clientSoc);
         }
-        else if(strcmp(command, "destroy")==0){
+        else if (strcmp(command, "destroy") == 0)
+        {
             destroyProject(buffer, clientSoc);
         }
-        else if(strcmp(command, "manifest")==0){
+        else if (strcmp(command, "manifest") == 0)
+        {
             fetchServerManifest(buffer, clientSoc);
         }
-        else if(strcmp(command, "commit")==0){
+        else if (strcmp(command, "commit") == 0)
+        {
             create_commit_file(buffer, clientSoc);
         }
         else if(strcmp(command, "push")==0){
@@ -705,7 +823,12 @@ void parseRead(char* buffer, int clientSoc){
             char* current_version = get_current_version(buffer, clientSoc);
             int n = write(clientSoc, current_version, strlen(current_version));
         }
-        else {
+        else if (strcmp(command, "sendfile") == 0)
+        {
+            fetchFile(buffer, clientSoc, command);
+        }
+        else
+        {
             printf("Have not implemented this command yet!\n");
         }
         free(command);
@@ -714,119 +837,133 @@ void parseRead(char* buffer, int clientSoc){
 
 //============================ NETWORKING ==================================
 /* blocking read */
-char* block_read(int fd, int targetBytes){
-    char* buffer = (char*) malloc(sizeof(char)*targetBytes);
-    bzero(buffer,targetBytes);
-    int status = 0;    
+char *block_read(int fd, int targetBytes)
+{
+    char *buffer = (char *)malloc(sizeof(char) * targetBytes + 1);
+    memset(buffer, '\0', targetBytes + 1);
+    int status = 0;
     int readIn = 0;
-    do{
-        status = read(fd, buffer+readIn, targetBytes-readIn);
+    do
+    {
+        status = read(fd, buffer + readIn, targetBytes - readIn);
         readIn += status;
     } while (status > 0 && readIn < targetBytes);
-    if (readIn < 0) 
+    buffer[targetBytes] = '\0';
+    if (readIn < 0)
         printf("ERROR reading from socket");
-    return buffer; 
+    return buffer;
 }
 
 /* blocking write */
-void block_write(int fd, char* data, int targetBytes){
-    int status = 0;    
+void block_write(int fd, char *data, int targetBytes)
+{
+    int status = 0;
     int readIn = 0;
-    do{
-        status = write(fd, data+readIn, targetBytes-readIn);
+    do
+    {
+        status = write(fd, data + readIn, targetBytes - readIn);
         readIn += status;
     } while (status > 0 && readIn < targetBytes);
-    if (readIn < 0) 
+    if (readIn < 0)
         printf("ERROR writing to socket");
 }
 
-int read_len_message(int fd){
+int read_len_message(int fd)
+{
     //printf("um");
-    char* buffer = (char*) malloc(sizeof(char)*50);
-    bzero(buffer,50);
-    int status = 0;    
+    char *buffer = (char *)malloc(sizeof(char) * 50);
+    bzero(buffer, 50);
+    int status = 0;
     int readIn = 0;
-    do{
-        status = read(fd, buffer+readIn, 1);
-        readIn +=status;
-    } while (buffer[readIn-1] != ':' && status > 0);
-    char* num = (char*) malloc(sizeof(char)*strlen(buffer));
-    strncpy(num, buffer, strlen(buffer)-1);
-    num[strlen(buffer)] = '\0';
+    do
+    {
+        status = read(fd, buffer + readIn, 1);
+        readIn += status;
+    } while (buffer[readIn - 1] != ':' && status > 0);
+    char *num = (char *)malloc(sizeof(char) * strlen(buffer));
+    strncpy(num, buffer, strlen(buffer) - 1);
+    num[strlen(buffer) - 1] = '\0';
     free(buffer);
-    //printf("%s", num);
-    int len = atoi(num);
+    int len = atoi(num); // - strlen(num) - 1;
     free(num);
     return len;
 }
-int set_up_connection(char* port){
+int set_up_connection(char *port)
+{
     int sockfd, clientSoc;
     struct sockaddr_in serv_addr, cli_addr;
     /* Set up Listening Socket */
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0)
         printf("ERROR opening socket");
-    bzero((char *) &serv_addr, sizeof(serv_addr));
+    bzero((char *)&serv_addr, sizeof(serv_addr));
     int portno = atoi(port);
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     serv_addr.sin_port = htons(portno);
-    if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
-            printf("ERROR on binding");
-    listen(sockfd,5);
+    if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+        printf("ERROR on binding");
+    listen(sockfd, 5);
 
     /* Accept Client Connection*/
     int clilen = sizeof(cli_addr);
-    clientSoc = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+    clientSoc = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
     if (clientSoc < 0)
-          printf("ERROR on accept");
+        printf("ERROR on accept");
 
     // /* Exchange Initial Messages */
     int len = read_len_message(clientSoc);
-    // printf("%d", len);
-    char* buffer =  block_read(clientSoc, len);
-    printf("%s\n",buffer);
-    block_write(clientSoc,"41:Client successfully connected to Server!\0",44);
-
+    char *buffer = block_read(clientSoc, len);
+    printf("%s\n", buffer);
+    block_write(clientSoc, "40:Client successfully connected to Server!", 43);
     free(buffer);
     return clientSoc;
 }
 
 /* This method disconnects from client if necessary in the future*/
-void disconnectServer(fd){
-    write(fd, "Done",4);
+void disconnectServer(fd)
+{
+    write(fd, "Done", 4);
     close(fd);
 }
 
-
 // ===================  MAIN METHOD  ================================================================================
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
     int clientSock;
     int n;
-    if (argc < 2) {
+    if (argc < 2)
+    {
         printf("ERROR: No port provided\n");
         exit(1);
     }
-    
+
     clientSock = set_up_connection(argv[1]);
-    
-     /* Code to infinite read from server and disconnect when client sends DONE*/
-    while (1){
+
+    // /* Code to infinite read from server and disconnect when client sends DONE*/
+    while (1)
+    {
         int len = read_len_message(clientSock);
-        printf("%d", len);
-        char* buffer =  block_read(clientSock, len);
-        printf("%s\n",buffer);
-        if (strcmp(buffer, "Done") == 0){
-            printf("Client Disconnected");
+        printf("Recieved Message of Length: %d\n", len);
+        char *buffer = block_read(clientSock, len);
+        printf("Message from Client: %s\n", buffer);
+        if (strcmp(buffer, "Done") == 0)
+        {
+            printf("Client Disconnected\n");
+            free(buffer);
             break;
-        } else {
+        }
+        else
+        {
             /*Parse through the buffer*/
             parseRead(buffer, clientSock);
         }
+        free(buffer);
     }
-
+    // do I close server listening socket? Idts
+    printf("Server Disconnected\n");
     close(clientSock);
 
     // things to consider: do a nonblocking read, disconnect server from client
-     return 0;
+    return 0;
 }
