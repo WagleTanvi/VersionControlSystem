@@ -51,31 +51,44 @@ void add_to_struct(char* line, Record** record_arr, int recordCount){
 }
 
 /* Returns an array of records */
-Record** create_record_struct(char* fileData){
+Record **create_record_struct(char *fileData, Boolean manifest)
+{
     int start = 0;
-    Boolean version = false;
+    Boolean version = !manifest;
     int pos = 0;
     int numberOfRecords = number_of_lines(fileData);
-    Record** record_arr = (Record**) malloc(sizeof(Record*)*numberOfRecords);
+    Record **record_arr = (Record **)malloc(sizeof(Record *) * numberOfRecords);
     int recordCount = 0;
+    if (!manifest) // if it is an update/conflict/commit file
+    {
+        Record *record = (Record *)malloc(sizeof(Record));
+        numberOfRecords++;
+        record->hash = to_Str(numberOfRecords);
+        record_arr[0] = record;
+        recordCount += 1;
+    }
     while (pos < strlen(fileData))
     {
         if (fileData[pos] == '\n')
         {
+            // printf("%d\n", pos);
             int len = pos - start;
             char *temp = (char *)malloc(sizeof(char) * len + 2);
             temp[0] = '\0';
-            strncpy(temp, &fileData[start], len+1);
-            temp[len+1] = '\0';
-            if (version){ // if version number has already been seen
+            strncpy(temp, &fileData[start], len + 1);
+            temp[len + 1] = '\0';
+            if (version)
+            { // if version number has already been seen
+                //printf("%s\n", temp);
                 add_to_struct(temp, record_arr, recordCount);
-                start = pos+1;
+                start = pos + 1;
                 recordCount++;
                 free(temp);
             }
-            else{
-                Record* record = (Record*) malloc(sizeof(Record));
-                char* rec_count = (char*) malloc(sizeof(char)*50);
+            else
+            {
+                Record *record = (Record *)malloc(sizeof(Record));
+                char *rec_count = (char *)malloc(sizeof(char) * 50);
                 sprintf(rec_count, "%d", numberOfRecords);
                 record->version = temp;
                 record->file = NULL;
@@ -108,16 +121,31 @@ Boolean search_Record(Record** record_arr, char* targetFile){
     return false;
 }
 
-char* search_record_hash(Record** record_arr, char* targetFile){
+// char* search_record_hash(Record** record_arr, char* targetFile){
+//     int x = 1;
+//     int size = getRecordStructSize(record_arr);
+//     while ( x < size){
+//         if (strcmp(record_arr[x]->file, targetFile) == 0){
+//             return record_arr[x]->hash;
+//         }
+//         x++;
+//     }
+//     return NULL;
+// }
+
+int search_record_hash(Record **record_arr, char *targetFile)
+{
     int x = 1;
     int size = getRecordStructSize(record_arr);
-    while ( x < size){
-        if (strcmp(record_arr[x]->file, targetFile) == 0){
-            return record_arr[x]->hash;
+    while (x < size)
+    {
+        if (strcmp(record_arr[x]->file, targetFile) == 0)
+        {
+            return x;
         }
         x++;
     }
-    return NULL;
+    return -1;
 }
 
 /* Formats one record */
@@ -140,19 +168,52 @@ char* printRecord(Record* record){
     }
 }
 
-/* Free Record Array */
-void freeRecord(Record** record_arr){
-    int size = getRecordStructSize(record_arr);
-    free(record_arr[0]->version);
-    free(record_arr[0]->hash);
-    free(record_arr[0]);
+char *printAllRecords(Record **record)
+{
+    printf("%s\n", record[0]->hash);
+    int size = getRecordStructSize(record);
     int x = 1;
-    while (x < size){
-        free(record_arr[x]->version);
-        free(record_arr[x]->file);
-        free(record_arr[x]->hash);
-        free(record_arr[x]);
+    while (x < size)
+    {
+        printf("%s\n", printRecord(record[x]));
         x++;
     }
-    free(record_arr);
+}
+
+/* Free Record Array */
+// u = update/commmit/conflict file
+// m = manifest file
+// a = appended records
+void freeRecord(Record **record_arr, char flag, int size)
+{
+    int s = size;
+    int x = 0;
+    if (flag == 'm')
+    {
+        free(record_arr[0]->version);
+    }
+    if (flag == 'm' || flag == 'u')
+    {
+        free(record_arr[0]->hash);
+        if (record_arr[0] != NULL)
+        {
+            free(record_arr[0]);
+        }
+        x = 1;
+    }
+    while (x < s)
+    {
+        if (record_arr[x] != NULL)
+        {
+            free(record_arr[x]->version);
+            free(record_arr[x]->file);
+            free(record_arr[x]->hash);
+            free(record_arr[x]);
+        }
+        x++;
+    }
+    if (record_arr != NULL)
+    {
+        free(record_arr);
+    }
 }

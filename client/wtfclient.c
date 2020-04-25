@@ -185,118 +185,6 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
     // freeRecord(client_manifest);
     // free_string_arr(live_hash_arr, client_manifest_size);
 }
-
-//===================================== ADD/REMOVE METHODS ============================================================================
-Boolean add_file_to_record(char *projectName, char *fileName, char *recordPath)
-{
-    int fd = open(recordPath, O_WRONLY | O_APPEND);
-    if (fd == -1)
-    {
-        return false;
-    }
-    char *manifestData = read_file(recordPath);
-    Record **record_arr = create_record_struct(manifestData, true);
-    if (search_Record(record_arr, fileName))
-    {
-        printf("Fatal Error: File %s already exists in Record\n", fileName);
-    }
-    else
-    {
-        write(fd, "1", 1);
-        write(fd, " ", 1);
-        write(fd, fileName, strlen(fileName));
-        write(fd, " ", 1);
-        char *fileData = read_file(fileName);
-        char *hashcode = getHash(fileData);
-        write(fd, hashcode, strlen(hashcode));
-        write(fd, "\n", 1);
-        free(hashcode);
-        free(fileData);
-    }
-    freeRecord(record_arr, 'm', getRecordStructSize(record_arr));
-    free(manifestData);
-    close(fd);
-}
-
-Boolean remove_file_from_record(char *projectName, char *fileName, char *recordPath)
-{
-    char *fileData = read_file(recordPath);
-    Record **record_arr = create_record_struct(fileData, true);
-    int x = 1;
-    int size = getRecordStructSize(record_arr);
-    int fd = open(recordPath, O_WRONLY | O_TRUNC);
-    if (fd == -1)
-    {
-        return false;
-    }
-    write(fd, record_arr[0]->version, strlen(record_arr[0]->version));
-    Boolean remove = false;
-    //printf("%s\n", fileName);
-    while (x < size)
-    {
-        if (strcmp(fileName, record_arr[x]->file) != 0)
-        {
-            char *temp = printRecord(record_arr[x]);
-            write(fd, temp, strlen(temp));
-            write(fd, "\n", 1);
-            //printf("%s\n", temp);
-            free(temp);
-        }
-        else
-        {
-            remove = true;
-        }
-        x++;
-    }
-    if (!remove)
-    {
-        printf("Fatal Error: record does not contain file\n");
-        return false;
-    }
-    freeRecord(record_arr, 'm', getRecordStructSize(record_arr));
-    free(fileData);
-    close(fd);
-}
-
-int read_len_message(int fd)
-{
-    //printf("um");
-    char *buffer = (char *)malloc(sizeof(char) * 50);
-    bzero(buffer, 50);
-    int status = 0;
-    int readIn = 0;
-    do
-    {
-        status = read(fd, buffer + readIn, 1);
-        readIn += status;
-        //printf("hey");
-    } while (buffer[readIn - 1] != ':' && status > 0);
-    char *num = (char *)malloc(sizeof(char) * strlen(buffer));
-    strncpy(num, buffer, strlen(buffer) - 1);
-    num[strlen(buffer) - 1] = '\0';
-    free(buffer);
-    int len = atoi(num); //- strlen(num) - 1;
-    //printf("%d\n", len);
-    free(num);
-    return len;
-}
-/* blocking read */
-char *block_read(int fd, int targetBytes)
-{
-    char *buffer = (char *)malloc(sizeof(char) * targetBytes + 1);
-    memset(buffer, '\0', targetBytes + 1);
-    int status = 0;
-    int readIn = 0;
-    do
-    {
-        status = read(fd, buffer + readIn, targetBytes - readIn);
-        readIn += status;
-    } while (status > 0 && readIn < targetBytes);
-    buffer[targetBytes] = '\0';
-    if (readIn < 0)
-        printf("ERROR reading from socket");
-    return buffer;
-}
 //=========================== UPGRADE METHODS==================================================================
 char *fetch_file_from_server(char *fileName, int sockfd)
 {
@@ -390,7 +278,7 @@ void upgrade(char *projectName, int sockfd)
     strcpy(updateFilePath, projectName);
     strcat(updateFilePath, "/.Update");
     char *conflictFilePath = (char *)malloc(strlen(projectName) + 1 + 10);
-    strcpy(conflictFupilePath, projectName);
+    strcpy(conflictFilePath, projectName);
     strcat(conflictFilePath, "/.Conflict");
     char *tempServerFilePath = (char *)malloc(strlen(projectName) + 1 + 16);
     strcpy(tempServerFilePath, projectName);
@@ -546,46 +434,6 @@ void upgrade(char *projectName, int sockfd)
 }
 
 //=========================== UPDATE METHODS==================================================================
-int read_len_message(int fd)
-{
-    //printf("um");
-    char *buffer = (char *)malloc(sizeof(char) * 50);
-    bzero(buffer, 50);
-    int status = 0;
-    int readIn = 0;
-    do
-    {
-        status = read(fd, buffer + readIn, 1);
-        readIn += status;
-        //printf("hey");
-    } while (buffer[readIn - 1] != ':' && status > 0);
-    char *num = (char *)malloc(sizeof(char) * strlen(buffer));
-    strncpy(num, buffer, strlen(buffer) - 1);
-    num[strlen(buffer) - 1] = '\0';
-    free(buffer);
-    int len = atoi(num); //- strlen(num) - 1;
-    //printf("%d\n", len);
-    free(num);
-    return len;
-}
-/* blocking read */
-char *block_read(int fd, int targetBytes)
-{
-    char *buffer = (char *)malloc(sizeof(char) * targetBytes + 1);
-    memset(buffer, '\0', targetBytes + 1);
-    int status = 0;
-    int readIn = 0;
-    do
-    {
-        status = read(fd, buffer + readIn, targetBytes - readIn);
-        readIn += status;
-    } while (status > 0 && readIn < targetBytes);
-    buffer[targetBytes] = '\0';
-    if (readIn < 0)
-        printf("ERROR reading from socket");
-    return buffer;
-}
-
 void update(char *projectName, int sockfd)
 {
     // create client manifest struct
@@ -728,8 +576,8 @@ void update(char *projectName, int sockfd)
                 free(currentFileData);
                 free(currentHash);
             }
-            free(currentFileData);
-            free(currentHash);
+            //free(currentFileData);
+            //free(currentHash);
         }
         free(temp);
         x++;
@@ -786,6 +634,78 @@ void update(char *projectName, int sockfd)
     free(tempServerFilePath);
     free(conflictFilePath);
     free(manifestFilePath);
+}
+
+//===================================== ADD/REMOVE METHODS ============================================================================
+Boolean add_file_to_record(char *projectName, char *fileName, char *recordPath)
+{
+    int fd = open(recordPath, O_WRONLY | O_APPEND);
+    if (fd == -1)
+    {
+        return false;
+    }
+    char *manifestData = read_file(recordPath);
+    Record **record_arr = create_record_struct(manifestData, true);
+    if (search_Record(record_arr, fileName))
+    {
+        printf("Fatal Error: File %s already exists in Record\n", fileName);
+    }
+    else
+    {
+        write(fd, "1", 1);
+        write(fd, " ", 1);
+        write(fd, fileName, strlen(fileName));
+        write(fd, " ", 1);
+        char *fileData = read_file(fileName);
+        char *hashcode = getHash(fileData);
+        write(fd, hashcode, strlen(hashcode));
+        write(fd, "\n", 1);
+        free(hashcode);
+        free(fileData);
+    }
+    freeRecord(record_arr, 'm', getRecordStructSize(record_arr));
+    free(manifestData);
+    close(fd);
+}
+
+Boolean remove_file_from_record(char *projectName, char *fileName, char *recordPath)
+{
+    char *fileData = read_file(recordPath);
+    Record **record_arr = create_record_struct(fileData, true);
+    int x = 1;
+    int size = getRecordStructSize(record_arr);
+    int fd = open(recordPath, O_WRONLY | O_TRUNC);
+    if (fd == -1)
+    {
+        return false;
+    }
+    write(fd, record_arr[0]->version, strlen(record_arr[0]->version));
+    Boolean remove = false;
+    //printf("%s\n", fileName);
+    while (x < size)
+    {
+        if (strcmp(fileName, record_arr[x]->file) != 0)
+        {
+            char *temp = printRecord(record_arr[x]);
+            write(fd, temp, strlen(temp));
+            write(fd, "\n", 1);
+            //printf("%s\n", temp);
+            free(temp);
+        }
+        else
+        {
+            remove = true;
+        }
+        x++;
+    }
+    if (!remove)
+    {
+        printf("Fatal Error: record does not contain file\n");
+        return false;
+    }
+    freeRecord(record_arr, 'm', getRecordStructSize(record_arr));
+    free(fileData);
+    close(fd);
 }
 
 //=================================================== CREATE ===============================================================
@@ -864,6 +784,24 @@ void delay(int number_of_seconds)
         ;
 }
 
+/* blocking read */
+char *block_read(int fd, int targetBytes)
+{
+    char *buffer = (char *)malloc(sizeof(char) * targetBytes + 1);
+    memset(buffer, '\0', targetBytes + 1);
+    int status = 0;
+    int readIn = 0;
+    do
+    {
+        status = read(fd, buffer + readIn, targetBytes - readIn);
+        readIn += status;
+    } while (status > 0 && readIn < targetBytes);
+    buffer[targetBytes] = '\0';
+    if (readIn < 0)
+        printf("ERROR reading from socket");
+    return buffer;
+}
+
 /* blocking write */
 void block_write(int fd, char *data, int targetBytes)
 {
@@ -898,6 +836,7 @@ int read_len_message(int fd)
     free(num);
     return len;
 }
+
 /* Connect to Server*/
 int create_socket(char *host, char *port)
 {
@@ -1092,6 +1031,15 @@ int main(int argc, char **argv)
         printf("Client Disconnecting\n");
         close(sockfd);
     }
+    else if (argc == 3 && (strcmp(argv[1], "upgrade") == 0))
+    {
+        /* Need to handle update error : project does not exist on server */
+        sockfd = read_configure_and_connect();
+        upgrade(argv[2], sockfd);
+        block_write(sockfd, "6:Done", 6);
+        printf("Client Disconnecting\n");
+        close(sockfd);
+    }
     else if(argc == 3 && (strcmp(argv[1], "commit")==0)){
         sockfd = read_configure_and_connect();
         int n = write_to_server(sockfd, "manifest", argv[2], argv[2]);
@@ -1141,33 +1089,8 @@ int main(int argc, char **argv)
     else if(argc == 3 && (strcmp(argv[1], "rollback")==0)){
     }
     else if(argc == 3 && (strcmp(argv[1], "currentversion")==0)){
-    else if (argc == 3 && (strcmp(argv[1], "upgrade") == 0))
-    {
-        /* Need to handle update error : project does not exist on server */
-        sockfd = read_configure_and_connect();
-        upgrade(argv[2], sockfd);
-        block_write(sockfd, "6:Done", 6);
-        printf("Client Disconnecting\n");
-        close(sockfd);
     }
-    else if (argc == 3 && (strcmp(argv[1], "commit") == 0))
-    {
-        //pretty sure commit does not work right now? idk didn't test yet, im scared
-
-        // sockfd = read_configure_and_connect();
-        // int n = write_to_server(sockfd, "manifest", argv[2]);
-        // if(n < 0)
-        //     printf("ERROR writing to socket.\n");
-        // else{
-        //     char* buffer = read_from_server(sockfd);
-        //     write_commit_file(sockfd, argv[2], buffer);
-        // }
-    }
-    else if (argc == 3 && (strcmp(argv[1], "push") == 0))
-    {
-    }
-    else
-    {
+    else{
         printf("Fatal Error: Invalid Arguments\n");
     }
     /*disconnect server at the end!*/
