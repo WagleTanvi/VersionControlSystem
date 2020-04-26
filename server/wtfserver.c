@@ -60,33 +60,27 @@ char* get_host_name()
 
 char *fetch_file_from_client(char *fileName, int clientSoc)
 {
-    int filePathLen = strlen(fileName);
-    int digLenFilePath = digits(filePathLen);
-    int lenMessage = filePathLen + digLenFilePath + 2 + strlen("sendfile");
-    int totalLen = digits(lenMessage) + lenMessage + 1;
-    char *command = (char *)malloc(sizeof(char) * totalLen + 1);
-    command[0] = '\0';
-    char *digLenFilePathChar = to_Str(digLenFilePath);
-    char *messageChar = to_Str(lenMessage);
-    strcpy(command, messageChar);
-    strcat(command, ":sendfile:");
-    strcat(command, digLenFilePathChar);
-    strcat(command, ":");
-    strcat(command, fileName);
-    printf("%s\n", command);
-    block_write(clientSoc, command, totalLen);
+    char* cmd = (char*)malloc(strlen("sendfile")+1+digits(strlen(fileName))+1+strlen(fileName)*sizeof(char));
+    cmd[0] = '\0';
+    strcat(cmd, "sendfile");
+    strcat(cmd, ":");
+    strcat(cmd, to_Str(strlen(fileName)));
+    strcat(cmd, ":");
+    strcat(cmd, fileName);
+    char* ext_cmd = (char*)malloc(digits(strlen(cmd))+1*sizeof(char));
+    ext_cmd[0] = '\0';
+    strcat(ext_cmd, to_Str(strlen(cmd)));
+    strcat(ext_cmd, ":");
+    strcat(ext_cmd, cmd);
+    
+    block_write(clientSoc, ext_cmd, strlen(ext_cmd));
     int messageLen = read_len_message(clientSoc);
-    printf("Receieved from Server a message of length: %d\n", messageLen);
-    char *clientData = block_read(clientSoc, messageLen);
+    char* clientData = block_read(clientSoc, messageLen);
     if (strstr(clientData, "ERROR") != NULL) // check if errored (project name does not exist on server)
     {
         printf("%s", clientData);
         return NULL;
     }
-    printf("%s\n", clientData);
-    free(digLenFilePathChar);
-    free(messageChar);
-    free(command);
     return clientData;
 }
 
@@ -275,6 +269,7 @@ void write_record_to_file(int fd, Record **records, Boolean append, int size)
 void duplicate_dir(char *project_path, char *new_project_path)
 {
     char path[4096];
+    char newpath[4096];
     struct dirent *d;
     DIR *dir = opendir(project_path);
     if (dir == NULL)
@@ -286,8 +281,8 @@ void duplicate_dir(char *project_path, char *new_project_path)
     while ((d = readdir(dir)) != NULL)
     {
         snprintf(path, 4096, "%s/%s", project_path, d->d_name);
-        snprintf(path, 4096, "%s/%s", new_project_path, d->d_name);
-        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0)
+        snprintf(newpath, 4096, "%s/%s", new_project_path, d->d_name);
+        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0 || strcmp(d->d_name, "pending-commits") == 0)
             continue;
         if (d->d_type == DT_DIR)
         {
@@ -295,11 +290,14 @@ void duplicate_dir(char *project_path, char *new_project_path)
         }
         else
         {
-            int dup_file = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0775);
+            int dup_file = open(newpath, O_WRONLY | O_CREAT | O_TRUNC, 0775);
             if (dup_file < 0)
             {
                 printf("ERROR unable to make new file: %s\n", strerror(errno));
             }
+            char* old_file_contents = getFileContent(path, "");
+            write(dup_file, old_file_contents, strlen(old_file_contents));
+            
         }
     }
     closedir(dir);

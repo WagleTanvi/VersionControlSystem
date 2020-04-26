@@ -82,6 +82,7 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
 {
     //first check if the client has updates to be made
     char *pclient = (char *)malloc(strlen(project_name) + strlen("./Update") * sizeof(char));
+    pclient[0] = '\0';
     strcat(pclient, project_name);
     strcat(pclient, "/.Update");
     if (fileExists(pclient) == true)
@@ -97,6 +98,7 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
 
     /*check if there is a conflict file*/
     char *pclient2 = (char *)malloc(strlen(project_name) + strlen("./Conflict") * sizeof(char));
+    pclient2[0] = '\0';
     strcat(pclient2, project_name);
     strcat(pclient2, "/.Conflict");
     if (fileExists(pclient2) == true)
@@ -109,6 +111,7 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
 
     // /*get server and client manifests*/
     char *pclient3 = (char *)malloc(strlen(project_name) + strlen("./Manifest") * sizeof(char));
+    pclient3[0] = '\0';
     strcat(pclient3, project_name);
     strcat(pclient3, "/.Manifest");
     Record **server_manifest = create_record_struct(server_record_data, true);
@@ -703,7 +706,7 @@ Boolean add_file_to_record(char *projectName, char *fileName, char *recordPath)
     }
     else
     {
-        write(fd, "0", 1);
+        write(fd, "1", 1);
         write(fd, " ", 1);
         write(fd, fileName, strlen(fileName));
         write(fd, " ", 1);
@@ -893,7 +896,7 @@ int read_len_message(int fd)
     } while (buffer[readIn - 1] != ':' && status > 0);
     char *num = (char *)malloc(sizeof(char) * strlen(buffer));
     strncpy(num, buffer, strlen(buffer) - 1);
-    num[strlen(buffer)] = '\0';
+    num[strlen(buffer)-1] = '\0';
     free(buffer);
     //printf("%s", num);
     int len = atoi(num);
@@ -1158,8 +1161,11 @@ int main(int argc, char **argv)
         else{
             while(1){
                 char* buffer = read_from_server(sockfd);
-                if(strstr(buffer, "sendfile")){
+                if(strstr(buffer, "sendfile")!=NULL){
                     fetchFile(buffer, sockfd);
+                    char* buffer = read_from_server(sockfd);
+                    fetchFile(buffer, sockfd);
+                    continue;
                 } 
                 else if(strcmp(buffer, "Server has successfully pushed.\0")==0){
                     remove_commit_file(sockfd, argv[2]);
