@@ -34,6 +34,19 @@ void fetchFile(char *buffer, int sockfd)
     block_write(sockfd, send, totalLen);
 }
 
+void increment_manifest_version(char* project_name, int sockfd){
+    // /*get client manifests*/
+    char *manifest = (char *)malloc(strlen(project_name) + strlen("./Manifest") * sizeof(char));
+    manifest[0] = '\0';
+    strcat(manifest, project_name);
+    strcat(manifest, "/.Manifest");
+    char *client_manifest_data = read_file(manifest);
+    Record **client_manifest = create_record_struct(client_manifest_data, true);
+    int size = getRecordStructSize(client_manifest);
+    client_manifest[0]->version = client_manifest[0]->version + 1;
+    write_record_to_file(sockfd, client_manifest, 0, size);
+}
+
 //========================HASHING===================================================
 unsigned char *getHash(char *s)
 {
@@ -1120,9 +1133,6 @@ int main(int argc, char **argv)
             char* buffer = read_from_server(sockfd);
             write_commit_file(sockfd, argv[2], buffer);
         } 
-        block_write(sockfd, "4:Done", 6);
-        printf("Client Disconnecting\n");
-        close(sockfd);
     }
     else if (argc == 3 && (strcmp(argv[1], "push") == 0))
     {
@@ -1169,14 +1179,11 @@ int main(int argc, char **argv)
                 } 
                 else if(strcmp(buffer, "Server has successfully pushed.\0")==0){
                     remove_commit_file(sockfd, argv[2]);
-                    /*also should increment the project number in the manifest right??*/
+                    increment_manifest_version(argv[2], sockfd);
                     break;
                 }
             }
         }
-        block_write(sockfd, "4:Done", 6);
-        printf("Client Disconnecting\n");
-        close(sockfd);
     }
     else if(argc == 4 && (strcmp(argv[1], "rollback")==0))
     {
