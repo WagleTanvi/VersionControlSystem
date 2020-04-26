@@ -831,6 +831,7 @@ void get_history_file(char *projectName, int sockfd)
         return;
     }
     printf("History for %s\n%s", projectName, newContent);
+    printf("Hello!\n");
 }
 //=========================== SOCKET/CONFIGURE METHODS==================================================================
 /* delay function - DOESNT really WORK*/
@@ -940,8 +941,8 @@ int create_socket(char *host, char *port)
         count++;
     } while (status < 0);
 
-    /* Exchange initial connection messages*/
-    block_write(sockfd, "48:Incoming client connection connection successful", 51);
+    // /* Exchange initial connection messages*/
+    block_write(sockfd, "48:Incoming client connection ilab2 successful", 51);
     int len = read_len_message(sockfd);
     //printf("%d\n", len);
     char *buffer = block_read(sockfd, len);

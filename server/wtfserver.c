@@ -1142,9 +1142,9 @@ int read_len_message(int fd)
     free(num);
     return len;
 }
+
 void *mainThread(void *arg)
 {
-
     int clientSock = *((int *)arg);
     // /* Code to infinite read from server and disconnect when client sends DONE*/
     while (1)
@@ -1152,12 +1152,16 @@ void *mainThread(void *arg)
         int len = read_len_message(clientSock);
         printf("Recieved Message of Length: %d\n", len);
         char *buffer = block_read(clientSock, len);
+        printf("The buffer is: %s\n", buffer);
         //printf("Message from Client: %s\n", buffer);
         if (strcmp(buffer, "Done") == 0)
         {
             printf("Client Disconnected\n");
             free(buffer);
             break;
+        }
+        else if(strcmp(buffer, "Incoming client connection ilab2 successful")==0){
+            block_write(clientSock, "23:Server got the message!", 26);
         }
         else
         {
@@ -1171,6 +1175,7 @@ void *mainThread(void *arg)
     close(clientSock);
     pthread_exit(NULL);
 }
+
 void set_up_connection(char *port)
 {
     int sockfd, clientSoc;
@@ -1181,31 +1186,33 @@ void set_up_connection(char *port)
         printf("ERROR opening socket");
     bzero((char *)&serv_addr, sizeof(serv_addr));
     int portno = atoi(port);
+
+    /*bind socket to port*/
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     serv_addr.sin_port = htons(portno);
     if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
         printf("ERROR on binding");
+
+    /*listen on port*/
     listen(sockfd, 10);
-    printf("Server Listening");
-    pthread_t tid[10];
-    int i = 0;
+    printf("Server Listening\n");
+
+    pthread_t thread;
     while (1)
     {
         /* Accept Client Connection = Blocking command */
         int clilen = sizeof(cli_addr);
         clientSoc = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
         if (clientSoc < 0)
+        {
             printf("ERROR on accept");
+        }
+        else
+        {
+            pthread_create(&thread, NULL, mainThread, &clientSoc);
+        }
 
-        // /* Exchange Initial Messages */
-        int len = read_len_message(clientSoc);
-        char *buffer = block_read(clientSoc, len);
-        printf("%s\n", buffer);
-        block_write(clientSoc, "40:Client successfully connected to Server!", 43);
-        free(buffer);
-        if (pthread_create(&tid[i], NULL, mainThread, &clientSoc) != 0)
-            printf("Failed to create thread\n");
     }
 }
 

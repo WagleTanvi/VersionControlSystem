@@ -124,7 +124,6 @@ void block_write(int fd, char *data, int targetBytes);
 
 int read_len_message(int fd);
 
-int set_up_connection(char *port);
 
 /* This method disconnects from client if necessary in the future*/
 void disconnectServer(int fd);
