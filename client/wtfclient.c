@@ -1,14 +1,51 @@
 #include "header-files/helper.h"
 #include "header-files/record.h"
 
+//========================HELPER===================================================
+
+void fetchFile(char *buffer, int sockfd)
+{
+    printf("Sending File to server\n");
+    char *cmd = strtok(buffer, ":");
+    char *plens = strtok(NULL, ":");
+    char *file_name = strtok(NULL, ":");
+    printf("%s", file_name);
+    int foundFile = fileExists(file_name);
+    if (!foundFile)
+    {
+        free(file_name);
+        int n = write(sockfd, "40:ERROR the file does not exist on server.\n", 40);
+        if (n < 0)
+            printf("ERROR writing to the server.\n");
+        return;
+    }
+    char *content = read_file(file_name);
+    int contentLen = strlen(content);
+    int digLen = digits(contentLen);
+    int totalLen = digLen + contentLen + 1;
+    char *send = (char *)malloc(sizeof(char *) * totalLen + 1);
+    send[0] = '\0';
+    char *messageLen = to_Str(contentLen);
+    strcat(send, messageLen);
+    strcat(send, ":");
+    strcat(send, content);
+    printf("%s\n", content);
+    printf("%s\n", send);
+    block_write(sockfd, send, totalLen);
+}
+
 //========================HASHING===================================================
-unsigned char* getHash(char* s){
-	unsigned char *d = SHA256(s, strlen(s), 0);
-	int i;
-	for (i = 0; i < SHA256_DIGEST_LENGTH; i++)
-		printf("%02x", d[i]);
-	putchar('\n');
-    return d;
+unsigned char *getHash(char *s)
+{
+    unsigned char *digest = SHA256(s, strlen(s), 0);
+    unsigned char *hexHash = (char *)malloc(sizeof(char) * 65);
+    int i = 0;
+    for (i = 0; i < SHA256_DIGEST_LENGTH; i++)
+    {
+        sprintf(hexHash + (i * 2), "%02x", digest[i]);
+    }
+    //printf("%s\n", hexHash);
+    return hexHash;
 }
 
 /*Returns an array holding the live hashes for each file in the given record*/
@@ -28,6 +65,16 @@ char **getLiveHashes(Record **record_arr, int size)
 }
 
 //=================================== COMMIT ===================================
+/* Removes the commit file from the client after push is called! */
+void remove_commit_file(int sockfd, char* project_name){
+    char* commit_path = (char*)malloc(strlen(project_name)+1+strlen("/.Commit")*sizeof(char));
+    commit_path[0] = '\0';
+    strcat(commit_path, project_name);
+    strcat(commit_path, "/.Commit");
+    int c = unlink(commit_path);
+    if(c<0) printf("ERROR could not delete the commit file!\n");
+    free(commit_path);
+}
 
 /*Sends the commit file to the server.*/
 void write_commit_file(int sockfd, char *project_name, char *server_record_data)
@@ -82,12 +129,12 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
     /*compute an array of live hashes*/
     char **live_hash_arr = getLiveHashes(client_manifest, client_manifest_size);
 
-    /*create path for commit*/
+    /*create commit if it doesn't exist- otherwise just append to the old commit file*/
     int path_len = strlen("./Commit")+strlen(project_name);
     char* commit_path = (char*)malloc(path_len+1*sizeof(char));
     snprintf(commit_path, path_len+1, "%s%s", project_name, "/.Commit");
     commit_path[path_len+1] = '\0'; 
-    int commit_fd = open(commit_path, O_WRONLY | O_CREAT | O_TRUNC, 00600);
+    int commit_fd = open(commit_path, O_WRONLY | O_CREAT | O_APPEND, 00600);
 
     /*go through each file in client manifest and compare manifests and write commit file*/
     int i = 1;
@@ -936,6 +983,7 @@ int write_to_server(int sockfd, char* argv1, char* argv2, char* project_name){
     strcat(new_command, ":");
     strcat(new_command, command);
     int n = write(sockfd, new_command, strlen(new_command));
+
     free(command);
     free(new_command);
     return n;
@@ -1027,7 +1075,7 @@ int main(int argc, char **argv)
         /* Need to handle update error : project does not exist on server */
         sockfd = read_configure_and_connect();
         update(argv[2], sockfd);
-        block_write(sockfd, "6:Done", 6);
+        block_write(sockfd, "4:Done", 6);
         printf("Client Disconnecting\n");
         close(sockfd);
     }
@@ -1036,7 +1084,7 @@ int main(int argc, char **argv)
         /* Need to handle update error : project does not exist on server */
         sockfd = read_configure_and_connect();
         upgrade(argv[2], sockfd);
-        block_write(sockfd, "6:Done", 6);
+        block_write(sockfd, "4:Done", 6);
         printf("Client Disconnecting\n");
         close(sockfd);
     }
@@ -1045,10 +1093,14 @@ int main(int argc, char **argv)
         int n = write_to_server(sockfd, "manifest", argv[2], argv[2]);
         if(n < 0)
             printf("ERROR writing to socket.\n");
-        else{
+        else
+        {
             char* buffer = read_from_server(sockfd);
             write_commit_file(sockfd, argv[2], buffer);
         } 
+        block_write(sockfd, "4:Done", 6);
+        printf("Client Disconnecting\n");
+        close(sockfd);
     }
     else if(argc == 3 && (strcmp(argv[1], "push")==0)){
         /*Get the data from the commit file*/
@@ -1079,29 +1131,60 @@ int main(int argc, char **argv)
         strcat(sec_cmd, ":");
         strcat(sec_cmd, manifest_file_content);
 
+        /*write to the server*/
         int n = write_to_server(sockfd, argv[1], sec_cmd, argv[2]);
         if(n < 0)
             printf("ERROR writing to socket.\n");
         else{
-            char* buffer = read_from_server(sockfd); 
+            char* buffer = read_from_server(sockfd);
+            if(strstr(buffer, "sendfile")){
+                fetchFile(buffer, sockfd);
+            } 
+            if(strcmp(buffer, "Server has successfully pushed.\0")==0){
+                remove_commit_file(sockfd, argv[2]);
+            } else {
+                printf("ERROR did not push successfully!.\n");
+            }
         }
+        block_write(sockfd, "4:Done", 6);
+        printf("Client Disconnecting\n");
+        close(sockfd);
     }
-    else if(argc == 3 && (strcmp(argv[1], "rollback")==0)){
+    else if(argc == 4 && (strcmp(argv[1], "rollback")==0))
+    {
+        sockfd = read_configure_and_connect();
+        char* sec_cmd = (char*)malloc(strlen(argv[2])+1+digits(strlen(argv[3]))+1+strlen(argv[3]));
+        strcat(sec_cmd, argv[2]); //project number
+        strcat(sec_cmd, ":");
+        strcat(sec_cmd, to_Str(strlen(argv[3])));
+        strcat(sec_cmd, ":");
+        strcat(sec_cmd, argv[3]); //version number
+        int n = write_to_server(sockfd, "rollback", sec_cmd, argv[2]);
+        if(n < 0)
+            printf("ERROR writing to socket.\n");
+        else{
+            char* buffer = read_from_server(sockfd);
+        }
+        block_write(sockfd, "4:Done", 6);
+        printf("Client Disconnecting\n");
+        close(sockfd);
     }
-    else if(argc == 3 && (strcmp(argv[1], "currentversion")==0)){
+    else if(argc == 3 && (strcmp(argv[1], "currentversion")==0))
+    {
+        sockfd = read_configure_and_connect();
+        int n = write_to_server(sockfd, "currentversion", argv[2], argv[2]);
+        if(n < 0)
+            printf("ERROR writing to socket.\n");
+        else{
+            char* buffer = read_from_server(sockfd);
+        }
+        block_write(sockfd, "4:Done", 6);
+        printf("Client Disconnecting\n");
+        close(sockfd);
     }
     else{
         printf("Fatal Error: Invalid Arguments\n");
     }
-    /*disconnect server at the end!*/
-    int n = write(sockfd, "Done", 4);
-    if(n < 0) printf("ERROR reading to socket.\n");
-
-    // sockfd = read_configure_and_connect();
-    // code to disconnect let server socket know client socket is disconnecting
-    // printf("Client Disconnecting");
-    // write(sockfd, "Done",4);
-    // close(sockfd);
 
     return 0;
 }

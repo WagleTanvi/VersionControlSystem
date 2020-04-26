@@ -2,6 +2,82 @@
 #include "header-files/record.h"
 
 int cmd_count = 0;
+  
+// Returns host information corresponding to host name 
+void checkHostEntry(struct hostent * hostentry) 
+{ 
+    if (hostentry == NULL) 
+    { 
+        perror("gethostbyname"); 
+        exit(1); 
+    } 
+} 
+  
+// Converts space-delimited IPv4 addresses 
+// to dotted-decimal format 
+void checkIPbuffer(char *IPbuffer) 
+{ 
+    if (NULL == IPbuffer) 
+    { 
+        perror("inet_ntoa"); 
+        exit(1); 
+    } 
+} 
+  
+// Driver code 
+char* get_host_name()
+{ 
+    char hostbuffer[256]; 
+    char *IPbuffer; 
+    struct hostent *host_entry; 
+    int hostname; 
+  
+    // To retrieve host information 
+    host_entry = gethostbyname(hostbuffer); 
+    checkHostEntry(host_entry); 
+  
+    // To convert an Internet network 
+    // address into ASCII string 
+    IPbuffer = inet_ntoa(*((struct in_addr*) 
+                           host_entry->h_addr_list[0])); 
+  
+    printf("Hostname: %s\n", hostbuffer); 
+    printf("Host IP: %s", IPbuffer); 
+  
+    return IPbuffer; 
+} 
+
+char *fetch_file_from_client(char *fileName, int clientSoc)
+{
+    int filePathLen = strlen(fileName);
+    int digLenFilePath = digits(filePathLen);
+    int lenMessage = filePathLen + digLenFilePath + 2 + strlen("sendfile");
+    int totalLen = digits(lenMessage) + lenMessage + 1;
+    char *command = (char *)malloc(sizeof(char) * totalLen + 1);
+    command[0] = '\0';
+    char *digLenFilePathChar = to_Str(digLenFilePath);
+    char *messageChar = to_Str(lenMessage);
+    strcpy(command, messageChar);
+    strcat(command, ":sendfile:");
+    strcat(command, digLenFilePathChar);
+    strcat(command, ":");
+    strcat(command, fileName);
+    printf("%s\n", command);
+    block_write(clientSoc, command, totalLen);
+    int messageLen = read_len_message(clientSoc);
+    printf("Receieved from Server a message of length: %d\n", messageLen);
+    char *clientData = block_read(clientSoc, messageLen);
+    if (strstr(clientData, "ERROR") != NULL) // check if errored (project name does not exist on server)
+    {
+        printf("%s", clientData);
+        return NULL;
+    }
+    printf("%s\n", clientData);
+    free(digLenFilePathChar);
+    free(messageChar);
+    free(command);
+    return clientData;
+}
 
 //=============================== CURRENT VERSION ======================
 /*Returns the current version of a project as a string*/
@@ -175,15 +251,17 @@ void push_commits(char* buffer, int clientSoc){
     bcount +=(strlen(file_content)+1);
 
     /*Get server commit file and compare with the client commit file*/
-    char* pserver = (char*)malloc(strlen(project_name)+strlen("/.Commit"));
+    char* hostname = get_host_name();
+    char* pserver = (char*)malloc(strlen(project_name)+strlen(hostname)+strlen("/pending-commits/.Commit"));
     pserver[0]='\0';
     strcat(pserver, project_name); 
-    strcat(pserver, "/.Commit");
+    strcat(pserver, "/pending-commits/.Commit");
+    strcat(pserver, hostname);
     char* server_file_content = getFileContent(pserver, "");
-    if(strcmp(file_content, server_file_content)!=0){
-        printf("ERROR the client and sever commit files do not match.\n");
-        return;
-    }
+    // if(strcmp(file_content, server_file_content)!=0){
+    //     printf("ERROR the client and sever commit files do not match.\n");
+    //     return;
+    // }
     int num = number_of_lines(server_file_content);
 
     /*Get the manifest file data*/
@@ -205,6 +283,11 @@ void push_commits(char* buffer, int clientSoc){
     char* manifest_data = getFileContent(manifestpath, "");
     Record** server_manifest = create_record_struct(manifest_data, num, 'M');
     int server_manifest_size = getRecordStructSize(server_manifest);
+    int i = 0;
+    while(i < server_manifest_size){
+        server_manifest[i] = NULL;
+        i++;
+    }
 
     /*Get the client manifest- make it into a record struct*/
     Record** client_manifest = create_record_struct(file_content2, 0, 'M');
@@ -249,6 +332,18 @@ void push_commits(char* buffer, int clientSoc){
             } else {
                 printf("ERROR could not find the file in the manifest. Update?\n");
             }
+            char* newContent = fetch_file_from_client(filepath, clientSoc);
+            if (newContent == NULL)
+            {
+                return;
+            }
+            // write content to file
+            int fd = open(filepath, O_WRONLY | O_TRUNC);
+            if (fd == -1)
+            {
+                printf("Fatal Error: Could not open Update file");
+            }
+            block_write(fd, newContent, strlen(newContent));
         }
         else if(strcmp(active_commit[x]->version, "A")==0){ //add file
             /*make commit file*/
@@ -273,6 +368,18 @@ void push_commits(char* buffer, int clientSoc){
                 }
                 if(server_manifest[m]!=NULL && m != server_manifest_size) server_manifest[m] = new_manifest_rec;
             }
+            char *newContent = fetch_file_from_client(filepath, clientSoc);
+            if (newContent == NULL)
+            {
+                return;
+            }
+            // write content to file
+            int fd = open(filepath, O_WRONLY | O_CREAT | O_TRUNC, 00600);
+            if (fd == -1)
+            {
+                printf("Fatal Error: Could not open Update file");
+            }
+            block_write(fd, newContent, strlen(newContent));
         }
         else if(strcmp(active_commit[x]->version, "D")==0){ //delete file
             char* filepath = active_commit[x]->file;
@@ -315,6 +422,9 @@ void push_commits(char* buffer, int clientSoc){
         x++;
     }
 
+    /*delete the commit file*/
+    int unl = unlink(pserver);
+
     /*tell the client that push was successful*/
     block_write(clientSoc, "32:Server has successfully pushed.\0", 35);
 
@@ -342,10 +452,11 @@ void create_commit_file(char *buffer, int clientSoc)
     }
 
     /*make commit file*/
-    char* pserver = (char*)malloc(strlen(project_name)+strlen("/.Commit"));
+    char* hostname = get_host_name();
+    char* pserver = (char*)malloc(strlen(project_name)+strlen(hostname)+strlen("/pending-commits/.Commit"));
     pserver[0]='\0';
     strcat(pserver, project_name); 
-    strcat(pserver, "/.Commit");
+    strcat(pserver, "/pending-commits/.Commit");
     int commitFile = open(pserver, O_WRONLY | O_CREAT | O_TRUNC, 0775);
     if (commitFile < 0)
     {
@@ -813,10 +924,12 @@ void parseRead(char *buffer, int clientSoc)
         {
             create_commit_file(buffer, clientSoc);
         }
-        else if(strcmp(command, "push")==0){
+        else if(strcmp(command, "push")==0)
+        {
             push_commits(buffer, clientSoc);
         }
-        else if(strcmp(command, "rollback")==0){
+        else if(strcmp(command, "rollback")==0)
+        {
             rollback(buffer, clientSoc);
         }
         else if(strcmp(command, "currentversion")==0){
@@ -921,7 +1034,7 @@ int set_up_connection(char *port)
 }
 
 /* This method disconnects from client if necessary in the future*/
-void disconnectServer(fd)
+void disconnectServer(int fd)
 {
     write(fd, "Done", 4);
     close(fd);
