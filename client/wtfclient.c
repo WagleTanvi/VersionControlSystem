@@ -1143,6 +1143,7 @@ int main(int argc, char **argv)
                 } 
                 else if(strcmp(buffer, "Server has successfully pushed.\0")==0){
                     remove_commit_file(sockfd, argv[2]);
+                    /*also should increment the project number in the manifest right??*/
                     break;
                 }
             }

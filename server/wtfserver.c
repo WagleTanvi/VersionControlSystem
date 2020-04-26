@@ -205,6 +205,41 @@ void rollback(char* buffer, int clientSoc){
 
 
 //=============================== PUSH ======================
+char *printAllRecords(Record **record)
+{
+    printf("%s\n", record[0]->hash);
+    int size = getRecordStructSize(record);
+    int x = 1;
+    while (x < size)
+    {
+        printf("%s\n", printRecord(record[x]));
+        x++;
+    }
+}
+
+/*Write the information in the record to a file*/
+void write_record_to_file(int fd, Record **records, Boolean append, int size)
+{
+    int s = size;
+    int x = 0;
+    if (!append)
+    {
+        x = 1;
+        write(fd, records[0]->version, strlen(records[0]->version));
+    }
+    while (x < s)
+    {
+        if (records[x] != NULL)
+        {
+            char *temp = printRecord(records[x]);
+            write(fd, temp, strlen(temp));
+            write(fd, "\n", 1);
+            free(temp);
+        }
+        x++;
+    }
+}
+
 /*Given a project name, duplicate the directory*/
 void duplicate_dir(char* project_path, char* new_project_path){
     char path[4096];
@@ -408,6 +443,8 @@ void push_commits(char* buffer, int clientSoc){
         x++;
     }   
 
+    printAllRecords(server_manifest);
+
     /*re-make the manifest file*/
     int u = remove(manifestpath);
     int new_manifest_file = open(manifestpath, O_WRONLY | O_CREAT | O_TRUNC, 0775);
@@ -462,16 +499,26 @@ void create_commit_file(char *buffer, int clientSoc)
         return;
     }
 
+    /*make the pending commits folder - stores each commit for each client*/
+    char* pending_commits = (char*)malloc(strlen(project_name)+strlen("/pending-commits\0")*sizeof(char));
+    pending_commits[0]='\0';
+    strcat(pending_commits, project_name);
+    strcat(pending_commits, "/pending-commits\0"); 
+    mkdir_recursive(pending_commits);
+    int ch = chmod(pending_commits, 0775);
+    if(ch<0) printf("ERROR set permission error.\n");
+
     /*make commit file*/
     char* hostname = get_host_name();
-    char* pserver = (char*)malloc(strlen(project_name)+strlen(hostname)+strlen("/pending-commits/.Commit"));
+    char* pserver = (char*)malloc(strlen(project_name)+strlen(hostname)+strlen("/pending-commits/.Commit-"));
     pserver[0]='\0';
     strcat(pserver, project_name); 
-    strcat(pserver, "/pending-commits/.Commit");
+    strcat(pserver, "/pending-commits/.Commit-");
+    strcat(pserver, hostname);
     int commitFile = open(pserver, O_WRONLY | O_CREAT | O_TRUNC, 0775);
     if (commitFile < 0)
     {
-        printf("ERROR unable to make manifestFile: %s\n", strerror(errno));
+        printf("ERROR unable to make commit file: %s\n", strerror(errno));
     }
 
     /*write the commit file content to the file*/
@@ -870,6 +917,7 @@ void createProject(char *buffer, int clientSoc)
         {
             printf("ERROR unable to make manifestFile: %s\n", strerror(errno));
         }
+        write(manifestFile, "1\n", 2);
     }
     else if (strcmp(cmd, "checkout") == 0)
     {
@@ -1068,9 +1116,9 @@ int main(int argc, char **argv)
     while (1)
     {
         int len = read_len_message(clientSock);
-        printf("Recieved Message of Length: %d\n", len);
+        // printf("Recieved Message of Length: %d\n", len);
         char *buffer = block_read(clientSock, len);
-        printf("Message from Client: %s\n", buffer);
+        // printf("Message from Client: %s\n", buffer);
         if (strcmp(buffer, "Done") == 0)
         {
             printf("Client Disconnected\n");
