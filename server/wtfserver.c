@@ -972,7 +972,36 @@ int read_len_message(int fd)
     free(num);
     return len;
 }
-int set_up_connection(char *port)
+void *mainThread(void *arg)
+{
+
+    int clientSock = *((int *)arg);
+    // /* Code to infinite read from server and disconnect when client sends DONE*/
+    while (1)
+    {
+        int len = read_len_message(clientSock);
+        printf("Recieved Message of Length: %d\n", len);
+        char *buffer = block_read(clientSock, len);
+        //printf("Message from Client: %s\n", buffer);
+        if (strcmp(buffer, "Done") == 0)
+        {
+            printf("Client Disconnected\n");
+            free(buffer);
+            break;
+        }
+        else
+        {
+            /*Parse through the buffer*/
+            parseRead(buffer, clientSock);
+        }
+        free(buffer);
+    }
+    // do I close server listening socket? Idts
+    printf("Server Disconnected\n");
+    close(clientSock);
+    pthread_exit(NULL);
+}
+void set_up_connection(char *port)
 {
     int sockfd, clientSoc;
     struct sockaddr_in serv_addr, cli_addr;
@@ -987,21 +1016,27 @@ int set_up_connection(char *port)
     serv_addr.sin_port = htons(portno);
     if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
         printf("ERROR on binding");
-    listen(sockfd, 5);
+    listen(sockfd, 10);
+    printf("Server Listening");
+    pthread_t tid[10];
+    int i = 0;
+    while (1)
+    {
+        /* Accept Client Connection = Blocking command */
+        int clilen = sizeof(cli_addr);
+        clientSoc = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
+        if (clientSoc < 0)
+            printf("ERROR on accept");
 
-    /* Accept Client Connection*/
-    int clilen = sizeof(cli_addr);
-    clientSoc = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
-    if (clientSoc < 0)
-        printf("ERROR on accept");
-
-    // /* Exchange Initial Messages */
-    int len = read_len_message(clientSoc);
-    char *buffer = block_read(clientSoc, len);
-    printf("%s\n", buffer);
-    block_write(clientSoc, "40:Client successfully connected to Server!", 43);
-    free(buffer);
-    return clientSoc;
+        // /* Exchange Initial Messages */
+        int len = read_len_message(clientSoc);
+        char *buffer = block_read(clientSoc, len);
+        printf("%s\n", buffer);
+        block_write(clientSoc, "40:Client successfully connected to Server!", 43);
+        free(buffer);
+        if (pthread_create(&tid[i], NULL, mainThread, &clientSoc) != 0)
+            printf("Failed to create thread\n");
+    }
 }
 
 /* This method disconnects from client if necessary in the future*/
@@ -1022,31 +1057,7 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    clientSock = set_up_connection(argv[1]);
-
-    // /* Code to infinite read from server and disconnect when client sends DONE*/
-    while (1)
-    {
-        int len = read_len_message(clientSock);
-        printf("Recieved Message of Length: %d\n", len);
-        char *buffer = block_read(clientSock, len);
-        printf("Message from Client: %s\n", buffer);
-        if (strcmp(buffer, "Done") == 0)
-        {
-            printf("Client Disconnected\n");
-            free(buffer);
-            break;
-        }
-        else
-        {
-            /*Parse through the buffer*/
-            parseRead(buffer, clientSock);
-        }
-        free(buffer);
-    }
-    // do I close server listening socket? Idts
-    printf("Server Disconnected\n");
-    close(clientSock);
+    set_up_connection(argv[1]);
 
     // things to consider: do a nonblocking read, disconnect server from client
     return 0;
