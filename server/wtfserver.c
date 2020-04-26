@@ -90,6 +90,24 @@ char *fetch_file_from_client(char *fileName, int clientSoc)
     return clientData;
 }
 
+//=============================== HISTORY ======================
+/* Not tested */
+void save_history(char *commitData, char *projectName, char *version)
+{
+    char *filePath = (char *)malloc(strlen(projectName) + 1 + 9);
+    strcpy(filePath, projectName);
+    strcat(filePath, "/.History");
+    int fd = open(filePath, O_WRONLY | O_CREAT, 00600);
+    if (fd == -1)
+    {
+        printf("Fatal Error: Could not open History file");
+    }
+    write(fd, version, strlen(version));
+    write(fd, "\n", 1);
+    write(fd, commitData, strlen(version));
+    free(filePath);
+}
+
 //=============================== CURRENT VERSION ======================
 /*Returns the current version of a project as a string*/
 char *get_current_version(char *buffer, int clientSoc)
@@ -736,23 +754,7 @@ void fetchFile(char *buffer, int clientSoc, char *command)
     printf("%s\n", send);
     block_write(clientSoc, send, totalLen);
 }
-//=============================== HISTORY ======================
-/* Not tested */
-void save_history(char *commitData, char *projectName, char *version)
-{
-    char *filePath = (char *)malloc(strlen(projectName) + 1 + 9);
-    strcpy(filePath, projectName);
-    strcat(filePath, "/.History");
-    int fd = open(filePath, O_WRONLY | O_CREAT, 00600);
-    if (fd == -1)
-    {
-        printf("Fatal Error: Could not open History file");
-    }
-    write(fd, version, strlen(version));
-    write(fd, "\n", 1);
-    write(fd, commitData, strlen(version));
-    free(filePath);
-}
+
 //=============================== DESTROY ======================
 /*Returns 0 on success and -1 on fail on removing all files and directories given a path.*/
 int remove_directory(char *dirPath)
