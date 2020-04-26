@@ -16,9 +16,6 @@ int getRecordStructSize(Record** record_arr);
 /* Look in the records for a particular file name formatted as project/filepath */
 Boolean search_Record(Record** record_arr, char* targetFile);
 
-/* Returns the hash in the records */
-// char* search_record_hash(Record** record_arr, char* targetFile);
-
 int search_record_hash(Record **record_arr, char *targetFile);
 
 /* Formats one record */

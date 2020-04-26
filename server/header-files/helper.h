@@ -15,6 +15,8 @@
 #include <netdb.h>
 #include <libgen.h>
 #include <openssl/sha.h>
+#include <netinet/in.h> 
+#include <arpa/inet.h> 
 
 typedef struct Record{
     char* version; //for manifest it is the version number, for upgrade and push it is the command 'M','A', or 'D'
@@ -23,12 +25,6 @@ typedef struct Record{
 } Record;
 
 typedef enum Boolean {true = 1, false = 0} Boolean;
-
-//================== PROTOTYPES===========================================
-void destroyProject(char* buffer, int clientSoc);
-int remove_directory(char* dirPath);
-void block_write(int fd, char* data, int targetBytes);
-void duplicate_dir(char* project_path, char* new_project_path);
 
 //================== HELPER ===========================================
 /*Count digits in a number*/
@@ -57,5 +53,80 @@ char* getFileContent(char* file, char* flag);
 
 /*Returns if server has the given project - needs the full path.*/
 Boolean search_proj_exists(char* project_name);
+  
+// Returns hostname for the local computer 
+void checkHostName(int hostname) ;
+  
+// Driver code 
+char* get_host_name(); 
+
+char *fetch_file_from_client(char *fileName, int clientSoc);
+
+//=============================== CURRENT VERSION ======================
+/*Returns the current version of a project as a string*/
+char* get_current_version(char* buffer, int clientSoc);
+
+//=============================== ROLLBACK ======================
+//23:projectname:13
+void rollback(char* buffer, int clientSoc);
+
+//=============================== PUSH ======================
+/*Given a project name, duplicate the directory*/
+void duplicate_dir(char* project_path, char* new_project_path);
+
+//push:23:projectname:234:blahblahcommintcontent
+void push_commits(char* buffer, int clientSoc);
+
+//=============================== COMMIT ======================
+void create_commit_file(char *buffer, int clientSoc);
+
+//===============================GET MANIFEST======================
+/*Sends the contents of the manifest to the client.*/
+int send_manifest(char *project_name, int clientSoc);
+
+/*Gets the project manifest that exists on server side.*/
+void fetchServerManifest(char *buffer, int clientSoc);
+
+/* Returns true if file exists in project */
+Boolean fileExists(char *fileName);
+
+void fetchFile(char *buffer, int clientSoc, char *command);
+
+//=============================== DESTROY ======================
+/*Returns 0 on success and -1 on fail on removing all files and directories given a path.*/
+int remove_directory(char *dirPath);
+
+/*Remove a project from the server side.*/
+void destroyProject(char *buffer, int clientSoc);
+
+//=============================== CHECKOUT ======================
+/*Increments the global counter- cmd_count*/
+void inc_command_length(char* dirPath);
+
+/*Returns an char** array that stores all the things to be concatenated together.*/
+char *checkoutProject(char *command, char *dirPath, int clientSoc);
+  
+
+//============================= CREATE ===================================
+/*Create project folder.*/
+void createProject(char *buffer, int clientSoc);
+
+//=============================== READ CLIENT MESSAGE ======================
+/*Parse through the client command.*/
+void parseRead(char *buffer, int clientSoc);
+
+//============================ NETWORKING ==================================
+/* blocking read */
+char *block_read(int fd, int targetBytes);
+
+/* blocking write */
+void block_write(int fd, char *data, int targetBytes);
+
+int read_len_message(int fd);
+
+int set_up_connection(char *port);
+
+/* This method disconnects from client if necessary in the future*/
+void disconnectServer(int fd);
 
 #endif

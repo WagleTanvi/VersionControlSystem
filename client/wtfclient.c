@@ -111,8 +111,10 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
     strcat(pclient3, project_name);
     strcat(pclient3, "/.Manifest");
     Record **server_manifest = create_record_struct(server_record_data, true);
+    printAllRecords(server_manifest);
     char *client_manifest_data = read_file(pclient3);
     Record **client_manifest = create_record_struct(client_manifest_data, true);
+    printAllRecords(server_manifest);
     int client_manifest_size = getRecordStructSize(client_manifest);
     int server_manifest_size = getRecordStructSize(server_manifest);
 

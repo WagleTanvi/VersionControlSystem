@@ -121,18 +121,6 @@ Boolean search_Record(Record** record_arr, char* targetFile){
     return false;
 }
 
-// char* search_record_hash(Record** record_arr, char* targetFile){
-//     int x = 1;
-//     int size = getRecordStructSize(record_arr);
-//     while ( x < size){
-//         if (strcmp(record_arr[x]->file, targetFile) == 0){
-//             return record_arr[x]->hash;
-//         }
-//         x++;
-//     }
-//     return NULL;
-// }
-
 int search_record_hash(Record **record_arr, char *targetFile)
 {
     int x = 1;

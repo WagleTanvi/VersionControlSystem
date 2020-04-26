@@ -84,7 +84,7 @@ Record* search_record(Record** record_arr, char* targetFile){
     int x = 1;
     int size = getRecordStructSize(record_arr);
     while (x < size){
-        if (strcmp(record_arr[x]->file, targetFile) == 0){
+        if (record_arr[x] != NULL && record_arr[x]->file != NULL && strcmp(record_arr[x]->file, targetFile) == 0){
             return record_arr[x];
         }
         x++;
