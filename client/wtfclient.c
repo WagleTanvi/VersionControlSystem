@@ -1136,14 +1136,15 @@ int main(int argc, char **argv)
         if(n < 0)
             printf("ERROR writing to socket.\n");
         else{
-            char* buffer = read_from_server(sockfd);
-            if(strstr(buffer, "sendfile")){
-                fetchFile(buffer, sockfd);
-            } 
-            if(strcmp(buffer, "Server has successfully pushed.\0")==0){
-                remove_commit_file(sockfd, argv[2]);
-            } else {
-                printf("ERROR did not push successfully!.\n");
+            while(1){
+                char* buffer = read_from_server(sockfd);
+                if(strstr(buffer, "sendfile")){
+                    fetchFile(buffer, sockfd);
+                } 
+                else if(strcmp(buffer, "Server has successfully pushed.\0")==0){
+                    remove_commit_file(sockfd, argv[2]);
+                    break;
+                }
             }
         }
         block_write(sockfd, "4:Done", 6);

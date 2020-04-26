@@ -3,13 +3,21 @@
 
 int cmd_count = 0;
   
+// Returns hostname for the local computer 
+void checkHostName(int hostname) 
+{ 
+    if (hostname == -1) 
+    { 
+        perror("gethostname"); 
+    } 
+}
+
 // Returns host information corresponding to host name 
 void checkHostEntry(struct hostent * hostentry) 
 { 
     if (hostentry == NULL) 
     { 
         perror("gethostbyname"); 
-        exit(1); 
     } 
 } 
   
@@ -20,7 +28,6 @@ void checkIPbuffer(char *IPbuffer)
     if (NULL == IPbuffer) 
     { 
         perror("inet_ntoa"); 
-        exit(1); 
     } 
 } 
   
@@ -32,6 +39,10 @@ char* get_host_name()
     struct hostent *host_entry; 
     int hostname; 
   
+    // To retrieve hostname 
+    hostname = gethostname(hostbuffer, sizeof(hostbuffer)); 
+    checkHostName(hostname); 
+
     // To retrieve host information 
     host_entry = gethostbyname(hostbuffer); 
     checkHostEntry(host_entry); 
@@ -252,10 +263,10 @@ void push_commits(char* buffer, int clientSoc){
 
     /*Get server commit file and compare with the client commit file*/
     char* hostname = get_host_name();
-    char* pserver = (char*)malloc(strlen(project_name)+strlen(hostname)+strlen("/pending-commits/.Commit"));
+    char* pserver = (char*)malloc(strlen(project_name)+strlen(hostname)+strlen("/pending-commits/.Commit-"));
     pserver[0]='\0';
     strcat(pserver, project_name); 
-    strcat(pserver, "/pending-commits/.Commit");
+    strcat(pserver, "/pending-commits/.Commit-");
     strcat(pserver, hostname);
     char* server_file_content = getFileContent(pserver, "");
     // if(strcmp(file_content, server_file_content)!=0){
@@ -283,7 +294,7 @@ void push_commits(char* buffer, int clientSoc){
     char* manifest_data = getFileContent(manifestpath, "");
     Record** server_manifest = create_record_struct(manifest_data, num, 'M');
     int server_manifest_size = getRecordStructSize(server_manifest);
-    int i = 0;
+    int i = 1;
     while(i < server_manifest_size){
         server_manifest[i] = NULL;
         i++;
