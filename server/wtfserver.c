@@ -412,7 +412,9 @@ void push_commits(char* buffer, int clientSoc){
                 while(server_manifest[m]!=NULL && m < server_manifest_size){
                     m++;
                 }
-                if(server_manifest[m]!=NULL && m != server_manifest_size) server_manifest[m] = new_manifest_rec;
+                if(server_manifest[m]==NULL && m != server_manifest_size){
+                    server_manifest[m] = new_manifest_rec;
+                } 
             }
             char *newContent = fetch_file_from_client(filepath, clientSoc);
             if (newContent == NULL)
@@ -442,8 +444,6 @@ void push_commits(char* buffer, int clientSoc){
         }
         x++;
     }   
-
-    printAllRecords(server_manifest);
 
     /*re-make the manifest file*/
     int u = remove(manifestpath);
