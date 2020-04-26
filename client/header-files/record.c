@@ -18,32 +18,36 @@ int number_of_lines(char *fileData)
 }
 
 /* Parses one line of the Record and addes to stuct */
-void add_to_struct(char* line, Record** record_arr, int recordCount){
+void add_to_struct(char *line, Record **record_arr, int recordCount)
+{
     int start = 0;
     int pos = 0;
     int count = 0;
-    Record* record = (Record*) malloc(sizeof(Record));
-    while (pos < strlen(line)){
-        if (line[pos] == ' ' || line[pos] == '\n'){
+    Record *record = (Record *)malloc(sizeof(Record));
+    while (pos < strlen(line))
+    {
+        if (line[pos] == ' ' || line[pos] == '\n')
+        {
             int len = pos - start;
             char *temp = (char *)malloc(sizeof(char) * len + 1);
             temp[0] = '\0';
             strncpy(temp, &line[start], len);
             temp[len] = '\0';
-            switch (count){
-                case 0:
-                    record->version = temp;
-                    break;
-                case 1:
-                    record->file = temp;
-                    break;
-                case 2:
-                    record->hash = temp;
-                    count = -1;
-                    break;
+            switch (count)
+            {
+            case 0:
+                record->version = temp;
+                break;
+            case 1:
+                record->file = temp;
+                break;
+            case 2:
+                record->hash = temp;
+                count = -1;
+                break;
             }
             count++;
-            start = pos+1;
+            start = pos + 1;
         }
         pos++;
     }
@@ -105,15 +109,19 @@ Record **create_record_struct(char *fileData, Boolean manifest)
 }
 
 /* Returns size of record array which is stored in the first position of the array hash value */
-int getRecordStructSize(Record** record_arr){
+int getRecordStructSize(Record **record_arr)
+{
     return atoi(record_arr[0]->hash);
 }
 /* Look in the records for a particular file name formatted as project/filepath */
-Boolean search_Record(Record** record_arr, char* targetFile){
+Boolean search_Record(Record **record_arr, char *targetFile)
+{
     int x = 1;
     int size = getRecordStructSize(record_arr);
-    while ( x < size){
-        if (strcmp(record_arr[x]->file, targetFile) == 0){
+    while (x < size)
+    {
+        if (strcmp(record_arr[x]->file, targetFile) == 0)
+        {
             return true;
         }
         x++;
@@ -137,21 +145,23 @@ int search_record_hash(Record **record_arr, char *targetFile)
 }
 
 /* Formats one record */
-char* printRecord(Record* record){
+char *printRecord(Record *record)
+{
     int len;
-    if (record == NULL){
+    if (record == NULL)
+    {
         return NULL;
     }
-    else{
-        int len = strlen(record->version)+strlen(record->file)+strlen(record->hash) + 1 + 3;
-        char* line = (char*) malloc(sizeof(char)*len);
+    else
+    {
+        int len = strlen(record->version) + strlen(record->file) + strlen(record->hash) + 1 + 3;
+        char *line = (char *)malloc(sizeof(char) * len);
         line[0] = '\0';
         strcat(line, record->version);
         strcat(line, " ");
+        strcat(line, record->file);
         strcat(line, " ");
-        strcat(line,record->file );
-        strcat(line, " ");
-        strcat(line,record->hash );
+        strcat(line, record->hash);
         return line;
     }
 }
