@@ -485,7 +485,6 @@ void push_commits(char *buffer, int clientSoc)
         else if (strcmp(active_commit[x]->version, "D") == 0)
         { //delete file
             char *filepath = active_commit[x]->file;
-            int r = unlink(filepath);
             Record *new_manifest_rec = search_record(server_manifest, filepath);
             if (new_manifest_rec != NULL)
             {
@@ -495,6 +494,8 @@ void push_commits(char *buffer, int clientSoc)
             {
                 printf("ERROR could not find the file in the manifest. Update?\n");
             }
+            int r = unlink(filepath);
+
         }
         else
         {
