@@ -19,10 +19,11 @@ int digits(int n)
 }
 
 /*Returns a string converted number*/
-char* to_Str(int number){
-    char* num_str = (char*)malloc(digits(number)+1*sizeof(char));
-    snprintf(num_str, digits(number)+1, "%d", number);
-    num_str[digits(number)+1] = '\0';
+char *to_Str(int number)
+{
+    char *num_str = (char *)malloc(digits(number) + 1 * sizeof(char));
+    snprintf(num_str, digits(number) + 1, "%d", number);
+    num_str[digits(number) + 1] = '\0';
     return num_str;
 }
 
@@ -38,7 +39,8 @@ void check_malloc_null(void *data)
 }
 
 /*Returns a substring*/
-char* getSubstring(int bcount, char* buffer, int nlen){
+char *getSubstring(int bcount, char *buffer, int nlen)
+{
     int count = 0;
     char *substr = (char *)malloc(nlen + 1 * sizeof(char));
     while (count < nlen)
@@ -52,13 +54,15 @@ char* getSubstring(int bcount, char* buffer, int nlen){
 }
 
 /*Returns a substring (delete later)*/
-char* substr(char *src, int m, int n){
-	int len = n - m;
-	char *dest = (char*)malloc(sizeof(char) * (len + 1));
-	int i = m;
-    while(i < n && (*(src + i) != '\0')){
-		*dest = *(src + i);
-		dest++;
+char *substr(char *src, int m, int n)
+{
+    int len = n - m;
+    char *dest = (char *)malloc(sizeof(char) * (len + 1));
+    int i = m;
+    while (i < n && (*(src + i) != '\0'))
+    {
+        *dest = *(src + i);
+        dest++;
         i++;
     }
     *dest = '\0';
@@ -66,7 +70,8 @@ char* substr(char *src, int m, int n){
 }
 
 /*Returns the length up to the colon*/
-int getUnknownLen(int bcount, char* buffer){
+int getUnknownLen(int bcount, char *buffer)
+{
     int count = 0;
     while (buffer[bcount] != ':')
     {
@@ -77,7 +82,8 @@ int getUnknownLen(int bcount, char* buffer){
 }
 
 /*Makes a directory with all the subdirectories etc.*/
-void mkdir_recursive(const char *path){
+void mkdir_recursive(const char *path)
+{
     char *subpath, *fullpath;
     fullpath = strdup(path);
     subpath = dirname(fullpath);
@@ -94,29 +100,34 @@ void mkdir_recursive(const char *path){
 }
 
 /* Returns true if file exists in project */
-Boolean fileExists(char* fileName){
+Boolean fileExists(char *fileName)
+{
     DIR *dir = opendir(fileName);
-    if (dir != NULL){
+    if (dir != NULL)
+    {
         printf("Fatal Error: %s Not a file or file path\n", fileName);
         closedir(dir);
         return false;
     }
     closedir(dir);
     int fd = open(fileName, O_RDONLY);
-    if(fd == -1){
+    if (fd == -1)
+    {
         //printf("Fatal Error: %s named %s\n", strerror(errno), file);
         //close(fd);
-        printf("Fatal Error: %s does not exist\n", fileName);
+        //printf("Fatal Error: %s does not exist\n", fileName);
         return false;
     }
-    close(fd); 
+    close(fd);
     return true;
 }
 
 /* Returns true if project is in folder */
-Boolean searchForProject(char* projectName){
+Boolean searchForProject(char *projectName)
+{
     DIR *dir = opendir(projectName);
-    if (dir == NULL){
+    if (dir == NULL)
+    {
         printf("Fatal Error: Project %s does not exist\n", projectName);
         return false;
     }
@@ -125,25 +136,29 @@ Boolean searchForProject(char* projectName){
 }
 
 /* Method to non-blocking read a file and returns a string with contents of file */
-char* read_file(char* file){
+char *read_file(char *file)
+{
     int fd = open(file, O_RDONLY);
-    if(fd == -1){
+    if (fd == -1)
+    {
         //printf("Fatal Error: %s named %s\n", strerror(errno), file);
         //close(fd);
         return NULL;
     }
     struct stat stats;
-    if(stat(file, &stats) == 0){
-        int fileSize = stats.st_size; 
-        if(fileSize == 0){
-            printf("Warning: %s file is empty.\n", file);
-        }
-        char* buffer = (char*)malloc(fileSize+1 * sizeof(char));
+    if (stat(file, &stats) == 0)
+    {
+        int fileSize = stats.st_size;
+        // if(fileSize == 0){
+        //     printf("Warning: %s file is empty.\n", file);
+        // }
+        char *buffer = (char *)malloc(fileSize + 1 * sizeof(char));
         check_malloc_null(buffer);
-        int status = 0;    
+        int status = 0;
         int readIn = 0;
-        do{
-            status = read(fd, buffer+readIn, fileSize);
+        do
+        {
+            status = read(fd, buffer + readIn, fileSize);
             readIn += status;
         } while (status > 0 && readIn < fileSize);
         buffer[fileSize] = '\0';
@@ -157,9 +172,11 @@ char* read_file(char* file){
 
 //================================= FREE METHODS==================================================================
 /*Free 2d String array*/
-void free_string_arr(char** arr, int size){
+void free_string_arr(char **arr, int size)
+{
     int i = 0;
-    while(i < size){
+    while (i < size)
+    {
         free(arr[i]);
         i++;
     }
@@ -168,9 +185,11 @@ void free_string_arr(char** arr, int size){
 //================================= PRINTING METHODS==================================================================
 
 /*Prints out 2d string array*/
-void print_2d_arr(char** arr, int size){
+void print_2d_arr(char **arr, int size)
+{
     int i = 1;
-    while(i < size){
+    while (i < size)
+    {
         printf("%s\n", (arr[i]));
         i++;
     }

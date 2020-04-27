@@ -67,13 +67,15 @@ char **getLiveHashes(Record **record_arr, int size)
 
 //=================================== COMMIT ===================================
 /* Removes the commit file from the client after push is called! */
-void remove_commit_file(int sockfd, char* project_name){
-    char* commit_path = (char*)malloc(strlen(project_name)+1+strlen("/.Commit")*sizeof(char));
+void remove_commit_file(int sockfd, char *project_name)
+{
+    char *commit_path = (char *)malloc(strlen(project_name) + 1 + strlen("/.Commit") * sizeof(char));
     commit_path[0] = '\0';
     strcat(commit_path, project_name);
     strcat(commit_path, "/.Commit");
     int c = unlink(commit_path);
-    if(c<0) printf("ERROR could not delete the commit file!\n");
+    if (c < 0)
+        printf("ERROR could not delete the commit file!\n");
     free(commit_path);
 }
 
@@ -136,10 +138,10 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
     char **live_hash_arr = getLiveHashes(client_manifest, client_manifest_size);
 
     /*create commit if it doesn't exist- otherwise just append to the old commit file*/
-    int path_len = strlen("./Commit")+strlen(project_name);
-    char* commit_path = (char*)malloc(path_len+1*sizeof(char));
-    snprintf(commit_path, path_len+1, "%s%s", project_name, "/.Commit");
-    commit_path[path_len+1] = '\0'; 
+    int path_len = strlen("./Commit") + strlen(project_name);
+    char *commit_path = (char *)malloc(path_len + 1 * sizeof(char));
+    snprintf(commit_path, path_len + 1, "%s%s", project_name, "/.Commit");
+    commit_path[path_len + 1] = '\0';
     int commit_fd = open(commit_path, O_WRONLY | O_CREAT | O_APPEND, 00600);
 
     /*go through each file in client manifest and compare manifests and write commit file*/
@@ -325,6 +327,24 @@ int find_number_of_adds(Record **records)
     }
     return count;
 }
+char *extract_path(char *path)
+{
+    int size = strlen(path);
+    int x = size - 1;
+    while (x >= 0)
+    {
+        if (path[x] == '/')
+        {
+            break;
+        }
+        x--;
+    }
+    char *temp = (char *)malloc(sizeof(char) * x + 2);
+    strncpy(temp, path, x + 1);
+    temp[x + 1] = '\0';
+    printf("%s\n", temp);
+    return temp;
+}
 void upgrade(char *projectName, int sockfd)
 {
     // check if there is  .Update file or .Conflict file
@@ -364,7 +384,7 @@ void upgrade(char *projectName, int sockfd)
         char *fileData = read_file(manifestFilePath);
         if (content == NULL || strcmp(content, "") == 0)
         {
-            printf("Project is up to date");
+            printf("Project is up to date\n");
             unlink(updateFilePath);
             free(updateFilePath);
             free(conflictFilePath);
@@ -381,6 +401,9 @@ void upgrade(char *projectName, int sockfd)
         //printAllRecords(updateRecords);
         int size = getRecordStructSize(updateRecords);
         int x = 1;
+
+        // sync manifest version numbers
+        manifestClient[0]->version = serverRecords[0]->version;
         // proccess updates
         while (x < size)
         {
@@ -404,11 +427,22 @@ void upgrade(char *projectName, int sockfd)
                 {
                     return;
                 }
+                char *subdirPath = extract_path(updateRecords[x]->file);
+                char *projTemp = (char *)malloc(sizeof(char) * strlen(projectName) + 2);
+                strcpy(projTemp, projectName);
+                strcat(projectName, "/");
+                projTemp[strlen(projectName) + 1] = '\0';
+                if (strcmp(subdirPath, projTemp) != 0)
+                {
+                    mkdir_recursive(subdirPath);
+                }
+                free(subdirPath);
+                free(projTemp);
                 // write content to file
                 int fd = open(updateRecords[x]->file, O_WRONLY | O_CREAT | O_TRUNC, 00600);
                 if (fd == -1)
                 {
-                    printf("Fatal Error: Could not open Update file");
+                    printf("Fatal Error: Could not open file");
                 }
                 block_write(fd, newContent, strlen(newContent));
                 // add to manifest
@@ -792,6 +826,7 @@ void parseBuffer_create(char *buffer)
             if (tok[0] == 'P')
             {
                 char *projectName = substr(tok, 1, strlen(tok));
+
                 mkdir_recursive(projectName);
                 int ch = chmod(projectName, 0775);
                 if (ch < 0)
@@ -896,7 +931,7 @@ int read_len_message(int fd)
     } while (buffer[readIn - 1] != ':' && status > 0);
     char *num = (char *)malloc(sizeof(char) * strlen(buffer));
     strncpy(num, buffer, strlen(buffer) - 1);
-    num[strlen(buffer)-1] = '\0';
+    num[strlen(buffer) - 1] = '\0';
     free(buffer);
     //printf("%s", num);
     int len = atoi(num);
@@ -946,6 +981,7 @@ int create_socket(char *host, char *port)
 
     // /* Exchange initial connection messages*/
     block_write(sockfd, "48:Incoming client connection ilab2 successful", 51);
+    //block_write(sockfd, "37:Incoming client connection successful", 40);
     int len = read_len_message(sockfd);
     //printf("%d\n", len);
     char *buffer = block_read(sockfd, len);
@@ -1078,14 +1114,25 @@ int main(int argc, char **argv)
             /* if manifest exists */
             if (fileExists(manifestFilePath))
             {
-                if (fileExists(filePath) && (strcmp(argv[1], "add") == 0))
+                if (fileExists(filePath))
                 {
-                    add_file_to_record(argv[2], filePath, manifestFilePath);
+                    if (strcmp(argv[1], "add") == 0)
+                    {
+                        add_file_to_record(argv[2], filePath, manifestFilePath);
+                    }
+                    else if (strcmp(argv[1], "remove") == 0)
+                    {
+                        remove_file_from_record(argv[2], filePath, manifestFilePath);
+                    }
                 }
-                else if (strcmp(argv[1], "remove") == 0)
+                else
                 {
-                    remove_file_from_record(argv[2], filePath, manifestFilePath);
+                    printf("Fatal Error: %s does not exist\n", filePath);
                 }
+            }
+            else
+            {
+                printf("Fatal Error: %s does not exist\n", manifestFilePath);
             }
             free(manifestFilePath);
         }
@@ -1117,9 +1164,9 @@ int main(int argc, char **argv)
             printf("ERROR writing to socket.\n");
         else
         {
-            char* buffer = read_from_server(sockfd);
+            char *buffer = read_from_server(sockfd);
             write_commit_file(sockfd, argv[2], buffer);
-        } 
+        }
         block_write(sockfd, "4:Done", 6);
         printf("Client Disconnecting\n");
         close(sockfd);
@@ -1158,16 +1205,20 @@ int main(int argc, char **argv)
         int n = write_to_server(sockfd, argv[1], sec_cmd, argv[2]);
         if (n < 0)
             printf("ERROR writing to socket.\n");
-        else{
-            while(1){
-                char* buffer = read_from_server(sockfd);
-                if(strstr(buffer, "sendfile")!=NULL){
+        else
+        {
+            while (1)
+            {
+                char *buffer = read_from_server(sockfd);
+                if (strstr(buffer, "sendfile") != NULL)
+                {
                     fetchFile(buffer, sockfd);
-                    char* buffer = read_from_server(sockfd);
+                    char *buffer = read_from_server(sockfd);
                     fetchFile(buffer, sockfd);
                     continue;
-                } 
-                else if(strcmp(buffer, "Server has successfully pushed.\0")==0){
+                }
+                else if (strcmp(buffer, "Server has successfully pushed.\0") == 0)
+                {
                     remove_commit_file(sockfd, argv[2]);
                     /*also should increment the project number in the manifest right??*/
                     break;
@@ -1178,33 +1229,35 @@ int main(int argc, char **argv)
         printf("Client Disconnecting\n");
         close(sockfd);
     }
-    else if(argc == 4 && (strcmp(argv[1], "rollback")==0))
+    else if (argc == 4 && (strcmp(argv[1], "rollback") == 0))
     {
         sockfd = read_configure_and_connect();
-        char* sec_cmd = (char*)malloc(strlen(argv[2])+1+digits(strlen(argv[3]))+1+strlen(argv[3]));
+        char *sec_cmd = (char *)malloc(strlen(argv[2]) + 1 + digits(strlen(argv[3])) + 1 + strlen(argv[3]));
         strcat(sec_cmd, argv[2]); //project number
         strcat(sec_cmd, ":");
         strcat(sec_cmd, to_Str(strlen(argv[3])));
         strcat(sec_cmd, ":");
         strcat(sec_cmd, argv[3]); //version number
         int n = write_to_server(sockfd, "rollback", sec_cmd, argv[2]);
-        if(n < 0)
+        if (n < 0)
             printf("ERROR writing to socket.\n");
-        else{
-            char* buffer = read_from_server(sockfd);
+        else
+        {
+            char *buffer = read_from_server(sockfd);
         }
         block_write(sockfd, "4:Done", 6);
         printf("Client Disconnecting\n");
         close(sockfd);
     }
-    else if(argc == 3 && (strcmp(argv[1], "currentversion")==0))
+    else if (argc == 3 && (strcmp(argv[1], "currentversion") == 0))
     {
         sockfd = read_configure_and_connect();
         int n = write_to_server(sockfd, "currentversion", argv[2], argv[2]);
-        if(n < 0)
+        if (n < 0)
             printf("ERROR writing to socket.\n");
-        else{
-            char* buffer = read_from_server(sockfd);
+        else
+        {
+            char *buffer = read_from_server(sockfd);
         }
         block_write(sockfd, "4:Done", 6);
         printf("Client Disconnecting\n");

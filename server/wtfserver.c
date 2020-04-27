@@ -2,80 +2,80 @@
 #include "header-files/record.h"
 
 int cmd_count = 0;
-  
-// Returns hostname for the local computer 
-void checkHostName(int hostname) 
-{ 
-    if (hostname == -1) 
-    { 
-        perror("gethostname"); 
-    } 
+
+// Returns hostname for the local computer
+void checkHostName(int hostname)
+{
+    if (hostname == -1)
+    {
+        perror("gethostname");
+    }
 }
 
-// Returns host information corresponding to host name 
-void checkHostEntry(struct hostent * hostentry) 
-{ 
-    if (hostentry == NULL) 
-    { 
-        perror("gethostbyname"); 
-    } 
-} 
-  
-// Converts space-delimited IPv4 addresses 
-// to dotted-decimal format 
-void checkIPbuffer(char *IPbuffer) 
-{ 
-    if (NULL == IPbuffer) 
-    { 
-        perror("inet_ntoa"); 
-    } 
-} 
-  
-// Driver code 
-char* get_host_name()
-{ 
-    char hostbuffer[256]; 
-    char *IPbuffer; 
-    struct hostent *host_entry; 
-    int hostname; 
-  
-    // To retrieve hostname 
-    hostname = gethostname(hostbuffer, sizeof(hostbuffer)); 
-    checkHostName(hostname); 
+// Returns host information corresponding to host name
+void checkHostEntry(struct hostent *hostentry)
+{
+    if (hostentry == NULL)
+    {
+        perror("gethostbyname");
+    }
+}
 
-    // To retrieve host information 
-    host_entry = gethostbyname(hostbuffer); 
-    checkHostEntry(host_entry); 
-  
-    // To convert an Internet network 
-    // address into ASCII string 
-    IPbuffer = inet_ntoa(*((struct in_addr*) 
-                           host_entry->h_addr_list[0])); 
-  
-    printf("Hostname: %s\n", hostbuffer); 
-    printf("Host IP: %s", IPbuffer); 
-  
-    return IPbuffer; 
-} 
+// Converts space-delimited IPv4 addresses
+// to dotted-decimal format
+void checkIPbuffer(char *IPbuffer)
+{
+    if (NULL == IPbuffer)
+    {
+        perror("inet_ntoa");
+    }
+}
+
+// Driver code
+char *get_host_name()
+{
+    char hostbuffer[256];
+    char *IPbuffer;
+    struct hostent *host_entry;
+    int hostname;
+
+    // To retrieve hostname
+    hostname = gethostname(hostbuffer, sizeof(hostbuffer));
+    checkHostName(hostname);
+
+    // To retrieve host information
+    host_entry = gethostbyname(hostbuffer);
+    checkHostEntry(host_entry);
+
+    // To convert an Internet network
+    // address into ASCII string
+    IPbuffer = inet_ntoa(*((struct in_addr *)
+                               host_entry->h_addr_list[0]));
+
+    printf("Hostname: %s\n", hostbuffer);
+    printf("Host IP: %s", IPbuffer);
+
+    return IPbuffer;
+}
 
 char *fetch_file_from_client(char *fileName, int clientSoc)
 {
-    char* cmd = (char*)malloc(strlen("sendfile")+1+digits(strlen(fileName))+1+strlen(fileName)*sizeof(char));
+    char *cmd = (char *)malloc(strlen("sendfile") + 1 + digits(strlen(fileName)) + 1 + strlen(fileName) * sizeof(char));
     cmd[0] = '\0';
     strcat(cmd, "sendfile");
     strcat(cmd, ":");
     strcat(cmd, to_Str(strlen(fileName)));
     strcat(cmd, ":");
     strcat(cmd, fileName);
-    char* ext_cmd = (char*)malloc(digits(strlen(cmd))+1*sizeof(char));
+    char *ext_cmd = (char *)malloc(digits(strlen(cmd)) + 1 * sizeof(char));
     ext_cmd[0] = '\0';
     strcat(ext_cmd, to_Str(strlen(cmd)));
     strcat(ext_cmd, ":");
     strcat(ext_cmd, cmd);
-    
+
     block_write(clientSoc, ext_cmd, strlen(ext_cmd));
     int messageLen = read_len_message(clientSoc);
-    char* clientData = block_read(clientSoc, messageLen);
+    char *clientData = block_read(clientSoc, messageLen);
     if (strstr(clientData, "ERROR") != NULL) // check if errored (project name does not exist on server)
     {
         printf("%s", clientData);
@@ -295,9 +295,8 @@ void duplicate_dir(char *project_path, char *new_project_path)
             {
                 printf("ERROR unable to make new file: %s\n", strerror(errno));
             }
-            char* old_file_contents = getFileContent(path, "");
+            char *old_file_contents = getFileContent(path, "");
             write(dup_file, old_file_contents, strlen(old_file_contents));
-            
         }
     }
     closedir(dir);
@@ -338,13 +337,13 @@ void push_commits(char *buffer, int clientSoc)
     bcount += (strlen(file_content) + 1);
 
     /*Get server commit file and compare with the client commit file*/
-    char* hostname = get_host_name();
-    char* pserver = (char*)malloc(strlen(project_name)+strlen(hostname)+strlen("/pending-commits/.Commit-"));
-    pserver[0]='\0';
-    strcat(pserver, project_name); 
+    char *hostname = get_host_name();
+    char *pserver = (char *)malloc(strlen(project_name) + strlen(hostname) + strlen("/pending-commits/.Commit-"));
+    pserver[0] = '\0';
+    strcat(pserver, project_name);
     strcat(pserver, "/pending-commits/.Commit-");
     strcat(pserver, hostname);
-    char* server_file_content = getFileContent(pserver, "");
+    char *server_file_content = getFileContent(pserver, "");
     // if(strcmp(file_content, server_file_content)!=0){
     //     printf("ERROR the client and sever commit files do not match.\n");
     //     return;
@@ -372,7 +371,8 @@ void push_commits(char *buffer, int clientSoc)
     Record **server_manifest = create_record_struct(manifest_data, num, 'M');
     int server_manifest_size = getRecordStructSize(server_manifest);
     int i = 1;
-    while(i < server_manifest_size){
+    while (i < server_manifest_size)
+    {
         server_manifest[i] = NULL;
         i++;
     }
@@ -425,7 +425,7 @@ void push_commits(char *buffer, int clientSoc)
             {
                 printf("ERROR could not find the file in the manifest. Update?\n");
             }
-            char* newContent = fetch_file_from_client(filepath, clientSoc);
+            char *newContent = fetch_file_from_client(filepath, clientSoc);
             if (newContent == NULL)
             {
                 return;
@@ -465,9 +465,10 @@ void push_commits(char *buffer, int clientSoc)
                 {
                     m++;
                 }
-                if(server_manifest[m]==NULL && m != server_manifest_size){
+                if (server_manifest[m] == NULL && m != server_manifest_size)
+                {
                     server_manifest[m] = new_manifest_rec;
-                } 
+                }
             }
             char *newContent = fetch_file_from_client(filepath, clientSoc);
             if (newContent == NULL)
@@ -561,19 +562,20 @@ void create_commit_file(char *buffer, int clientSoc)
     }
 
     /*make the pending commits folder - stores each commit for each client*/
-    char* pending_commits = (char*)malloc(strlen(project_name)+strlen("/pending-commits\0")*sizeof(char));
-    pending_commits[0]='\0';
+    char *pending_commits = (char *)malloc(strlen(project_name) + strlen("/pending-commits\0") * sizeof(char));
+    pending_commits[0] = '\0';
     strcat(pending_commits, project_name);
-    strcat(pending_commits, "/pending-commits\0"); 
+    strcat(pending_commits, "/pending-commits\0");
     mkdir_recursive(pending_commits);
     int ch = chmod(pending_commits, 0775);
-    if(ch<0) printf("ERROR set permission error.\n");
+    if (ch < 0)
+        printf("ERROR set permission error.\n");
 
     /*make commit file*/
-    char* hostname = get_host_name();
-    char* pserver = (char*)malloc(strlen(project_name)+strlen(hostname)+strlen("/pending-commits/.Commit-"));
-    pserver[0]='\0';
-    strcat(pserver, project_name); 
+    char *hostname = get_host_name();
+    char *pserver = (char *)malloc(strlen(project_name) + strlen(hostname) + strlen("/pending-commits/.Commit-"));
+    pserver[0] = '\0';
+    strcat(pserver, project_name);
     strcat(pserver, "/pending-commits/.Commit-");
     strcat(pserver, hostname);
     int commitFile = open(pserver, O_WRONLY | O_CREAT | O_TRUNC, 0775);
@@ -1062,11 +1064,11 @@ void parseRead(char *buffer, int clientSoc)
         {
             create_commit_file(buffer, clientSoc);
         }
-        else if(strcmp(command, "push")==0)
+        else if (strcmp(command, "push") == 0)
         {
             push_commits(buffer, clientSoc);
         }
-        else if(strcmp(command, "rollback")==0)
+        else if (strcmp(command, "rollback") == 0)
         {
             rollback(buffer, clientSoc);
         }
@@ -1150,7 +1152,7 @@ void *mainThread(void *arg)
         int len = read_len_message(clientSock);
         printf("Recieved Message of Length: %d\n", len);
         char *buffer = block_read(clientSock, len);
-        printf("The buffer is: %s\n", buffer);
+        printf("The Message is: %s\n", buffer);
         //printf("Message from Client: %s\n", buffer);
         if (strcmp(buffer, "Done") == 0)
         {
@@ -1158,7 +1160,8 @@ void *mainThread(void *arg)
             free(buffer);
             break;
         }
-        else if(strcmp(buffer, "Incoming client connection ilab2 successful")==0){
+        else if (strcmp(buffer, "Incoming client connection ilab2 successful") == 0)
+        {
             block_write(clientSock, "23:Server got the message!", 26);
         }
         else
@@ -1168,8 +1171,7 @@ void *mainThread(void *arg)
         }
         free(buffer);
     }
-    // do I close server listening socket? Idts
-    printf("Server Disconnected\n");
+    //printf("Server Disconnected\n");
     close(clientSock);
     pthread_exit(NULL);
 }
@@ -1190,8 +1192,10 @@ void set_up_connection(char *port)
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     serv_addr.sin_port = htons(portno);
     if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-        printf("ERROR on binding");
-
+    {
+        printf("Fatal Error: on binding");
+        exit()
+    }
     /*listen on port*/
     listen(sockfd, 10);
     printf("Server Listening\n");
@@ -1210,7 +1214,6 @@ void set_up_connection(char *port)
         {
             pthread_create(&thread, NULL, mainThread, &clientSoc);
         }
-
     }
 }
 
