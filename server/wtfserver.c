@@ -494,7 +494,7 @@ void push_commits(char *buffer, int clientSoc)
             {
                 printf("ERROR could not find the file in the manifest. Update?\n");
             }
-            int r = unlink(filepath);
+            int r = remove(filepath);
 
         }
         else
@@ -601,9 +601,6 @@ void create_commit_file(char *buffer, int clientSoc)
     }
     file_content[atoi(size)] = '\0';
     write(commitFile, file_content, atoi(size));
-
-    /*tell client everything is good*/
-    block_write(clientSoc, "33:Server has made the commit file.\0", 36);
 }
 
 //===============================GET MANIFEST======================
@@ -1096,6 +1093,7 @@ char *block_read(int fd, int targetBytes)
     memset(buffer, '\0', targetBytes + 1);
     int status = 0;
     int readIn = 0;
+    if(targetBytes==0)return NULL;
     do
     {
         status = read(fd, buffer + readIn, targetBytes - readIn);
@@ -1134,9 +1132,15 @@ int read_len_message(int fd)
         readIn += status;
     } while (buffer[readIn - 1] != ':' && status > 0);
     char *num = (char *)malloc(sizeof(char) * strlen(buffer));
-    strncpy(num, buffer, strlen(buffer) - 1);
-    num[strlen(buffer) - 1] = '\0';
-    free(buffer);
+    int i = 0;
+    while(i < strlen(buffer)){
+        num[i] = buffer[i];
+        i++;
+    }
+    num[strlen(buffer)] = '\0';
+    // strncpy(num, buffer, strlen(buffer) - 1);
+    // num[strlen(buffer) - 1] = '\0';
+    // free(buffer);
     int len = atoi(num); // - strlen(num) - 1;
     free(num);
     return len;
@@ -1149,9 +1153,10 @@ void *mainThread(void *arg)
     while (1)
     {
         int len = read_len_message(clientSock);
-        printf("Recieved Message of Length: %d\n", len);
+        //printf("Recieved Message of Length: %d\n", len);
         char *buffer = block_read(clientSock, len);
-        printf("The buffer is: %s\n", buffer);
+        if(buffer == NULL) continue;
+        //printf("The buffer is: %s\n", buffer);
         //printf("Message from Client: %s\n", buffer);
         if (strcmp(buffer, "Done") == 0)
         {

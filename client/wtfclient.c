@@ -218,7 +218,8 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
             write(commit_fd, " ", 1);
             write(commit_fd, file_name, strlen(file_name));
             write(commit_fd, " ", 1);
-            write(commit_fd, client_manifest[i]->hash, strlen(client_manifest[i]->hash));
+            write(commit_fd, server_manifest[i]->hash, strlen(server_manifest[i]->hash));
+            write(commit_fd, "\n", 1);
         }
         i++;
     }
@@ -908,9 +909,15 @@ int read_len_message(int fd)
         readIn += status;
     } while (buffer[readIn - 1] != ':' && status > 0);
     char *num = (char *)malloc(sizeof(char) * strlen(buffer));
-    strncpy(num, buffer, strlen(buffer) - 1);
-    num[strlen(buffer)-1] = '\0';
-    free(buffer);
+    int i = 0;
+    while(i < strlen(buffer)){
+        num[i] = buffer[i];
+        i++;
+    }
+    num[strlen(buffer)] = '\0';
+    // strncpy(num, buffer, strlen(buffer) - 1);
+    // num[strlen(buffer)-1] = '\0';
+    // free(buffer);
     //printf("%s", num);
     int len = atoi(num);
     free(num);
@@ -1179,7 +1186,7 @@ int main(int argc, char **argv)
                 } 
                 else if(strcmp(buffer, "Server has successfully pushed.\0")==0){
                     remove_commit_file(sockfd, argv[2]);
-                    increment_manifest_version(argv[2], sockfd);
+                    //increment_manifest_version(argv[2], sockfd);
                     break;
                 }
             }
