@@ -242,30 +242,9 @@ char *printAllRecords(Record **record)
     }
 }
 
-/*Write the information in the record to a file*/
-void write_record_to_file(int fd, Record **records, Boolean append, int size)
-{
-    int s = size;
-    int x = 0;
-    if (!append)
-    {
-        x = 1;
-        write(fd, records[0]->version, strlen(records[0]->version));
-    }
-    while (x < s)
-    {
-        if (records[x] != NULL)
-        {
-            char *temp = printRecord(records[x]);
-            write(fd, temp, strlen(temp));
-            write(fd, "\n", 1);
-            free(temp);
-        }
-        x++;
-    }
-}
-
 /*Given a project name, duplicate the directory*/
+// project path ivyproject
+// new project path history/ivyyproject-1
 void duplicate_dir(char *project_path, char *new_project_path)
 {
     char path[4096];
@@ -282,7 +261,7 @@ void duplicate_dir(char *project_path, char *new_project_path)
     {
         snprintf(path, 4096, "%s/%s", project_path, d->d_name);
         snprintf(newpath, 4096, "%s/%s", new_project_path, d->d_name);
-        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0 || strcmp(d->d_name, "pending-commits") == 0)
+        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0 || strcmp(d->d_name, "pending-commits") == 0 || strcmp(d->d_name, "history") == 0)
             continue;
         if (d->d_type == DT_DIR)
         {
@@ -371,11 +350,11 @@ void push_commits(char *buffer, int clientSoc)
     char *manifest_data = getFileContent(manifestpath, "");
     Record **server_manifest = create_record_struct(manifest_data, num, 'M');
     int server_manifest_size = getRecordStructSize(server_manifest);
-    int i = 1;
-    while(i < server_manifest_size){
-        server_manifest[i] = NULL;
-        i++;
-    }
+    // int i = number_of_lines(manifest_data);
+    // while(i < server_manifest_size){
+    //     server_manifest[i] = NULL;
+    //     i++;
+    // }
 
     /*Get the client manifest- make it into a record struct*/
     Record **client_manifest = create_record_struct(file_content2, 0, 'M');
@@ -485,15 +464,36 @@ void push_commits(char *buffer, int clientSoc)
         else if (strcmp(active_commit[x]->version, "D") == 0)
         { //delete file
             char *filepath = active_commit[x]->file;
-            Record *new_manifest_rec = search_record(server_manifest, filepath);
-            if (new_manifest_rec != NULL)
-            {
-                new_manifest_rec = NULL;
+            x = 1;
+            int size = getRecordStructSize(server_manifest);
+            while (x < size){
+                if (server_manifest[x] != NULL && server_manifest[x]->file != NULL && strcmp(server_manifest[x]->file, filepath) == 0){
+                    free(server_manifest[x]->version);
+                    free(server_manifest[x]->file);
+                    free(server_manifest[x]->hash);
+                    free(server_manifest[x]);
+                    server_manifest[x] = NULL;
+
+                }
+                x++;
             }
-            else
-            {
-                printf("ERROR could not find the file in the manifest. Update?\n");
-            }
+            // Record *new_manifest_rec = search_record(server_manifest, filepath);
+            // free(new_manifest_rec->version);
+            // new_manifest_rec->version = NULL;
+            // free(new_manifest_rec->file);
+            // new_manifest_rec->file = NULL;
+            // free(new_manifest_rec->hash);
+            // new_manifest_rec->hash = NULL;
+            // free(new_manifest_rec);
+            // new_manifest_rec = NULL;
+            // if (new_manifest_rec != NULL)
+            // {
+            //     new_manifest_rec = NULL;
+            // }
+            // else
+            // {
+            //     printf("ERROR could not find the file in the manifest. Update?\n");
+            // }
             int r = remove(filepath);
 
         }
@@ -505,7 +505,6 @@ void push_commits(char *buffer, int clientSoc)
     }
 
     /*re-make the manifest file*/
-    int u = remove(manifestpath);
     int new_manifest_file = open(manifestpath, O_WRONLY | O_CREAT | O_TRUNC, 0775);
     x = 0;
     while (x < server_manifest_size)
