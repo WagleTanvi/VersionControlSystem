@@ -2,87 +2,7 @@
 #include "header-files/record.h"
 
 int cmd_count = 0;
-  
-// Returns hostname for the local computer 
-void checkHostName(int hostname) 
-{ 
-    if (hostname == -1) 
-    { 
-        perror("gethostname"); 
-    } 
-}
 
-// Returns host information corresponding to host name 
-void checkHostEntry(struct hostent * hostentry) 
-{ 
-    if (hostentry == NULL) 
-    { 
-        perror("gethostbyname"); 
-    } 
-} 
-  
-// Converts space-delimited IPv4 addresses 
-// to dotted-decimal format 
-void checkIPbuffer(char *IPbuffer) 
-{ 
-    if (NULL == IPbuffer) 
-    { 
-        perror("inet_ntoa"); 
-    } 
-} 
-  
-// Driver code 
-char* get_host_name()
-{ 
-    char hostbuffer[256]; 
-    char *IPbuffer; 
-    struct hostent *host_entry; 
-    int hostname; 
-  
-    // To retrieve hostname 
-    hostname = gethostname(hostbuffer, sizeof(hostbuffer)); 
-    checkHostName(hostname); 
-
-    // To retrieve host information 
-    host_entry = gethostbyname(hostbuffer); 
-    checkHostEntry(host_entry); 
-  
-    // To convert an Internet network 
-    // address into ASCII string 
-    IPbuffer = inet_ntoa(*((struct in_addr*) 
-                           host_entry->h_addr_list[0])); 
-  
-    printf("Hostname: %s\n", hostbuffer); 
-    printf("Host IP: %s", IPbuffer); 
-  
-    return IPbuffer; 
-} 
-
-char *fetch_file_from_client(char *fileName, int clientSoc)
-{
-    char* cmd = (char*)malloc(strlen("sendfile")+1+digits(strlen(fileName))+1+strlen(fileName)*sizeof(char));
-    cmd[0] = '\0';
-    strcat(cmd, "sendfile");
-    strcat(cmd, ":");
-    strcat(cmd, to_Str(strlen(fileName)));
-    strcat(cmd, ":");
-    strcat(cmd, fileName);
-    char* ext_cmd = (char*)malloc(digits(strlen(cmd))+1*sizeof(char));
-    ext_cmd[0] = '\0';
-    strcat(ext_cmd, to_Str(strlen(cmd)));
-    strcat(ext_cmd, ":");
-    strcat(ext_cmd, cmd);
-    
-    block_write(clientSoc, ext_cmd, strlen(ext_cmd));
-    int messageLen = read_len_message(clientSoc);
-    char* clientData = block_read(clientSoc, messageLen);
-    if (strstr(clientData, "ERROR") != NULL) // check if errored (project name does not exist on server)
-    {
-        printf("%s", clientData);
-        return NULL;
-    }
-    return clientData;
-}
 
 //=============================== HISTORY ======================
 /* Not tested */
@@ -103,8 +23,10 @@ void save_history(char *commitData, char *projectName, char *version)
 }
 
 //=============================== CURRENT VERSION ======================
+
 /*Returns the current version of a project as a string*/
-char *get_current_version(char *buffer, int clientSoc)
+//currentversion:34:projectname
+char *get_current_version(char *buffer, int clientSoc, char flag)
 {
     /*get project name and check if the project exists in the server*/
     int bcount = 0;
@@ -114,7 +36,19 @@ char *get_current_version(char *buffer, int clientSoc)
     bcount += strlen(plens) + 1;
     int pleni = atoi(plens);
     char *project_name = getSubstring(bcount, buffer, pleni);
-    int foundProj = search_proj_exists(project_name);
+    
+    int foundProj = 0;
+    if(flag = 'H'){ //this is getting the current version for rollback
+        DIR *dir = opendir(project_name);
+        if(dir != NULL){
+            foundProj = 1;
+        }
+    }
+    else {
+        foundProj = search_proj_exists(project_name);
+    }
+
+    /*Deal with error when the project does not exist!*/
     if (foundProj == 0)
     {
         free(project_name);
@@ -136,6 +70,24 @@ char *get_current_version(char *buffer, int clientSoc)
 }
 
 //=============================== ROLLBACK ======================
+/*Returns a string to send to current version*/
+char* current_version_format(char* project_name, char* dir_name){
+    char* req_dir = (char*)malloc(strlen(project_name)+1+strlen("history")+1+strlen(dir_name));
+    req_dir[0] = '\0';
+    strcat(req_dir, project_name);
+    strcat(req_dir, "/history/");
+    strcat(req_dir, dir_name);
+
+    char* formatted = (char*)malloc(strlen("currentversion")+1+digits(strlen(req_dir))+1+strlen(req_dir));
+    formatted[0] = '\0';
+    strcat(formatted, "currentversion:");
+    strcat(formatted, to_Str(strlen(req_dir)));
+    strcat(formatted, ":");
+    strcat(formatted, req_dir);
+
+    return formatted;
+}
+
 //23:projectname:13
 void rollback(char *buffer, int clientSoc)
 {
@@ -157,7 +109,7 @@ void rollback(char *buffer, int clientSoc)
         return;
     }
 
-    /*Get the version number*/
+    /*Get the requested version number*/
     bcount += (strlen(project_name) + 1);
     int count = bcount;
     while (buffer[count] != '\0')
@@ -184,16 +136,17 @@ void rollback(char *buffer, int clientSoc)
     while ((d = readdir(dir)) != NULL)
     {
         snprintf(path, 4096, "%s/%s", history_dir, d->d_name);
-        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0)
+        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0 || strcmp(d->d_name, "history") == 0 || strcmp(d->d_name, "pending-commits") == 0)
             continue;
         if (d->d_type == DT_DIR)
         {
-            int version_num = atoi(get_current_version(d->d_name, clientSoc));
+            char* format_str = current_version_format(project_name, d->d_name);
+            int version_num = atoi(get_current_version(format_str, clientSoc, 'H'));
             if (version_num == req_version)
             {
                 found = true;
-                new_project_name = d->d_name;
-                break;
+                new_project_name = d->d_name; //new_project_name = ivyproject-1
+                // break;
             }
             else if (version_num > req_version)
             {
@@ -209,38 +162,32 @@ void rollback(char *buffer, int clientSoc)
     }
 
     /*Destory the current proejct and move this project outside the history folder and rename it*/
-    char *project_path = (char *)malloc(strlen(project_name) + strlen("/history/") + strlen(new_project_name) * sizeof(char));
+    char *project_path = (char *)malloc(strlen(project_name) + strlen("/history/") + strlen(new_project_name) * sizeof(char)); //ivyproject/history/ivyproject-1
     project_path[0] = '\0';
     strcat(project_path, project_name);
-    strcat(project_path, "/history\0");
+    strcat(project_path, "/history/\0");
     strcat(project_path, new_project_name);
 
-    char *new_project_path = (char *)malloc(strlen(project_name) + strlen(new_project_name) + 1 * sizeof(char));
-    new_project_path[0] = '\0';
-    strcat(new_project_path, project_name);
-    strcat(new_project_path, "/");
-    strcat(new_project_path, new_project_name);
+    duplicate_dir(project_path, new_project_name);
 
-    duplicate_dir(project_path, new_project_path);
-    destroyProject(project_name, clientSoc);
-    destroyProject(project_path, clientSoc);
+    char* proj_to_destroy = (char*)malloc(strlen("destroy")+1+digits(strlen(project_name))+1+strlen(project_name));
+    proj_to_destroy[0] = '\0';
+    strcat(proj_to_destroy, "destroy:");
+    strcat(proj_to_destroy, to_Str(strlen(project_name)));
+    strcat(proj_to_destroy, ":");
+    strcat(proj_to_destroy, project_name);
+    destroyProject(proj_to_destroy, clientSoc);
+
+    int r = rename(new_project_name, project_name);
+    if(r != 0){
+        printf("ERROR renaming directory.\n");
+    }
 
     /*Send a success to the client.*/
     block_write(clientSoc, "37:Server has successfully rolled back.\0", 40);
 }
 
 //=============================== PUSH ======================
-char *printAllRecords(Record **record)
-{
-    printf("%s\n", record[0]->hash);
-    int size = getRecordStructSize(record);
-    int x = 1;
-    while (x < size)
-    {
-        printf("%s\n", printRecord(record[x]));
-        x++;
-    }
-}
 
 /*Given a project name, duplicate the directory*/
 // project path ivyproject
@@ -477,23 +424,6 @@ void push_commits(char *buffer, int clientSoc)
                 }
                 x++;
             }
-            // Record *new_manifest_rec = search_record(server_manifest, filepath);
-            // free(new_manifest_rec->version);
-            // new_manifest_rec->version = NULL;
-            // free(new_manifest_rec->file);
-            // new_manifest_rec->file = NULL;
-            // free(new_manifest_rec->hash);
-            // new_manifest_rec->hash = NULL;
-            // free(new_manifest_rec);
-            // new_manifest_rec = NULL;
-            // if (new_manifest_rec != NULL)
-            // {
-            //     new_manifest_rec = NULL;
-            // }
-            // else
-            // {
-            //     printf("ERROR could not find the file in the manifest. Update?\n");
-            // }
             int r = remove(filepath);
 
         }
@@ -1069,7 +999,7 @@ void parseRead(char *buffer, int clientSoc)
         }
         else if (strcmp(command, "currentversion") == 0)
         {
-            char *current_version = get_current_version(buffer, clientSoc);
+            char *current_version = get_current_version(buffer, clientSoc, 'N');
             int n = write(clientSoc, current_version, strlen(current_version));
         }
         else if (strcmp(command, "sendfile") == 0)

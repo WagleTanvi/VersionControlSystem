@@ -1,52 +1,6 @@
 #include "header-files/helper.h"
 #include "header-files/record.h"
 
-//========================HELPER===================================================
-
-void fetchFile(char *buffer, int sockfd)
-{
-    printf("Sending File to server\n");
-    char *cmd = strtok(buffer, ":");
-    char *plens = strtok(NULL, ":");
-    char *file_name = strtok(NULL, ":");
-    printf("%s", file_name);
-    int foundFile = fileExists(file_name);
-    if (!foundFile)
-    {
-        free(file_name);
-        int n = write(sockfd, "40:ERROR the file does not exist on server.\n", 40);
-        if (n < 0)
-            printf("ERROR writing to the server.\n");
-        return;
-    }
-    char *content = read_file(file_name);
-    int contentLen = strlen(content);
-    int digLen = digits(contentLen);
-    int totalLen = digLen + contentLen + 1;
-    char *send = (char *)malloc(sizeof(char *) * totalLen + 1);
-    send[0] = '\0';
-    char *messageLen = to_Str(contentLen);
-    strcat(send, messageLen);
-    strcat(send, ":");
-    strcat(send, content);
-    printf("%s\n", content);
-    printf("%s\n", send);
-    block_write(sockfd, send, totalLen);
-}
-
-void increment_manifest_version(char* project_name, int sockfd){
-    // /*get client manifests*/
-    char *manifest = (char *)malloc(strlen(project_name) + strlen("./Manifest") * sizeof(char));
-    manifest[0] = '\0';
-    strcat(manifest, project_name);
-    strcat(manifest, "/.Manifest");
-    char *client_manifest_data = read_file(manifest);
-    Record **client_manifest = create_record_struct(client_manifest_data, true);
-    int size = getRecordStructSize(client_manifest);
-    client_manifest[0]->version = client_manifest[0]->version + 1;
-    write_record_to_file(sockfd, client_manifest, 0, size);
-}
-
 //========================HASHING===================================================
 unsigned char *getHash(char *s)
 {
@@ -1186,7 +1140,7 @@ int main(int argc, char **argv)
                 } 
                 else if(strcmp(buffer, "Server has successfully pushed.\0")==0){
                     remove_commit_file(sockfd, argv[2]);
-                    //increment_manifest_version(argv[2], sockfd);
+                    increment_manifest_version(argv[2], sockfd);
                     break;
                 }
             }
@@ -1196,7 +1150,7 @@ int main(int argc, char **argv)
     {
         sockfd = read_configure_and_connect();
         char* sec_cmd = (char*)malloc(strlen(argv[2])+1+digits(strlen(argv[3]))+1+strlen(argv[3]));
-        strcat(sec_cmd, argv[2]); //project number
+        strcat(sec_cmd, argv[2]); //project name
         strcat(sec_cmd, ":");
         strcat(sec_cmd, to_Str(strlen(argv[3])));
         strcat(sec_cmd, ":");
