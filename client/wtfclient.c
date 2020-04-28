@@ -972,6 +972,9 @@ void write_to_server(int sockfd, char *argv1, char *argv2, char *project_name)
     strcat(new_command, ":");
     strcat(new_command, command);
     block_write(sockfd, new_command, strlen(new_command));
+    
+    free(command);
+    free(new_command);
 }
 
 /*Returns the buffer from the server*/

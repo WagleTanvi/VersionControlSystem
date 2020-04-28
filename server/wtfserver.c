@@ -97,6 +97,7 @@ char* getFileContent(char* file, char* flag){
                 i++;
             }
             strcat(new_buffer, buffer);
+            free(buffer);
             return new_buffer;
         }
     }
@@ -1040,6 +1041,7 @@ void inc_command_length(char *dirPath)
             cmd_count += (digits(strlen(data_client)));
             cmd_count += (strlen(data_client));
             cmd_count += 2;
+            free(data_client);
         }
         else
         {
@@ -1078,6 +1080,9 @@ char *checkoutProject(char *command, char *dirPath, int clientSoc)
         strcat(command, ":");
         strcat(command, new_dirpath);
         strcat(command, ":");
+
+        free(length_of_path);
+        free(new_dirpath);
     }
     while ((d = readdir(dir)) != NULL)
     {
@@ -1103,6 +1108,9 @@ char *checkoutProject(char *command, char *dirPath, int clientSoc)
             strcat(command, new_path);
             strcat(command, ":");
 
+            free(new_path);
+            free(length_of_path);
+
             /*for the file content*/
             char *data_client = getFileContent(path, "C");
             char *length_of_data = to_Str(strlen(data_client));
@@ -1110,6 +1118,9 @@ char *checkoutProject(char *command, char *dirPath, int clientSoc)
             strcat(command, ":");
             strcat(command, data_client);
             strcat(command, ":");
+
+            free(data_client);
+            free(length_of_data);
         }
         else
         {
@@ -1176,6 +1187,7 @@ void createProject(char *buffer, int clientSoc)
             return;
         }
     }
+
     /*send string to client to make project*/
     cmd_count += (strlen(cmd) + 1);
     inc_command_length(project_name);
@@ -1186,17 +1198,23 @@ void createProject(char *buffer, int clientSoc)
     command = checkoutProject(command, project_name, clientSoc);
 
     /*add the length of the full commmand to the front of the protocol*/    
-    char *new_command = (char *)malloc(digits(strlen(command)) + strlen(command) + 1 * sizeof(char));
+    int size = digits(strlen(command))+1+strlen(command)+2;
+    char *new_command = (char *)malloc(size*sizeof(char));
     new_command[0] = '\0';
-    strcat(new_command, to_Str(strlen(command)));
+    char* slen = to_Str(strlen(command));
+    strcat(new_command, slen);
     strcat(new_command, ":");
     strcat(new_command, command);
+    new_command[size-1] = '\0';
+
     /*write command to client*/
-    int n = write(clientSoc, new_command, strlen(new_command));
+    int n = write(clientSoc, new_command, size);
     if (n < 0)
         printf("ERROR writing to the client.\n");
 
     /*free stuff*/
+    free(project_name);
+    free(slen);
     free(command);
     free(new_command);
 }
