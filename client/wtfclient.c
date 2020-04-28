@@ -82,10 +82,10 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
     strcat(pclient3, project_name);
     strcat(pclient3, "/.Manifest");
     Record **server_manifest = create_record_struct(server_record_data, true);
-    printAllRecords(server_manifest);
+    //printAllRecords(server_manifest);
     char *client_manifest_data = read_file(pclient3);
     Record **client_manifest = create_record_struct(client_manifest_data, true);
-    printAllRecords(server_manifest);
+    //printAllRecords(server_manifest);
     int client_manifest_size = getRecordStructSize(client_manifest);
     int server_manifest_size = getRecordStructSize(server_manifest);
 
@@ -200,12 +200,6 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
     int w = write(sockfd, extended_commit_cmd, strlen(extended_commit_cmd));
     if (w < 0)
         printf("ERROR writing to the server.\n");
-
-    /*Finally free!*/
-    // free(commit_path);
-    // freeRecord(server_manifest);
-    // freeRecord(client_manifest);
-    // free_string_arr(live_hash_arr, client_manifest_size);
 }
 //=========================== UPGRADE METHODS==================================================================
 char *fetch_file_from_server(char *fileName, int sockfd)
@@ -226,7 +220,7 @@ char *fetch_file_from_server(char *fileName, int sockfd)
     printf("Sending Message to Server: %s\n", command);
     block_write(sockfd, command, totalLen);
     int messageLen = read_len_message(sockfd);
-    printf("Receieved from Server a message of length: %d\n", messageLen);
+    //printf("Receieved from Server a message of length: %d\n", messageLen);
     char *serverData = block_read(sockfd, messageLen);
     if (strstr(serverData, "ERROR") != NULL) // check if errored (project name does not exist on server)
     {
@@ -919,11 +913,11 @@ int create_socket(char *host, char *port)
     } while (status < 0);
 
     // /* Exchange initial connection messages*/
-    block_write(sockfd, "48:Incoming client connection ilab2 successful", 51);
+    block_write(sockfd, "34:Successfully connected to client.\n", 37);
     int len = read_len_message(sockfd);
     //printf("%d\n", len);
     char *buffer = block_read(sockfd, len);
-    printf("%s\n", buffer);
+    //printf("%s\n", buffer);
     free(buffer);
 
     return sockfd;

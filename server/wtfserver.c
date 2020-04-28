@@ -69,6 +69,8 @@ char *get_current_version(char *buffer, int clientSoc, char flag)
     char *manifest_data = getFileContent(manifestpath, "");
     Record **manifest = create_record_struct(manifest_data, 0, 'M');
 
+    free(manifestpath);
+
     return manifest[0]->version;
 }
 
@@ -154,6 +156,8 @@ void rollback(char *buffer, int clientSoc)
             {
                 rmdir(path);
             }
+            free(req_dir);
+            free(format_str);
         }
     }
     closedir(dir);
@@ -188,6 +192,12 @@ void rollback(char *buffer, int clientSoc)
 
     /*Send a success to the client.*/
     block_write(clientSoc, "37:Server has successfully rolled back.\0", 40);
+
+    /*free stuff*/
+    free(history_dir);
+    free(project_path);
+    free(proj_to_destroy);
+    
 }
 
 //=============================== PUSH ======================
@@ -357,6 +367,7 @@ void push_commits(char *buffer, int clientSoc)
             {
                 return;
             }
+            pthread_mutex_lock(&mutex);
             // write content to file
             int fd = open(filepath, O_WRONLY | O_TRUNC);
             if (fd == -1)
@@ -364,6 +375,7 @@ void push_commits(char *buffer, int clientSoc)
                 printf("Fatal Error: Could not open Update file");
             }
             block_write(fd, newContent, strlen(newContent));
+            pthread_mutex_unlock(&mutex);
         }
         else if (strcmp(active_commit[x]->version, "A") == 0)
         { //add file
@@ -411,6 +423,7 @@ void push_commits(char *buffer, int clientSoc)
         }
         else if (strcmp(active_commit[x]->version, "D") == 0)
         { //delete file
+            pthread_mutex_lock(&mutex);
             char *filepath = active_commit[x]->file;
             x = 1;
             int size = getRecordStructSize(server_manifest);
@@ -426,6 +439,7 @@ void push_commits(char *buffer, int clientSoc)
                 x++;
             }
             int r = remove(filepath);
+            pthread_mutex_unlock(&mutex);
 
         }
         else
@@ -531,6 +545,7 @@ void create_commit_file(char *buffer, int clientSoc)
     }
     file_content[atoi(size)] = '\0';
     write(commitFile, file_content, atoi(size));
+    //block_write(clientSoc, "42:Server has successfully made commit file.\0", 45);
 }
 
 //===============================GET MANIFEST======================
@@ -652,11 +667,10 @@ Boolean fileExists(char *fileName)
 }
 void fetchFile(char *buffer, int clientSoc, char *command)
 {
-    printf("Sending File to client\n");
     char *cmd = strtok(buffer, ":");
     char *plens = strtok(NULL, ":");
     char *file_name = strtok(NULL, ":");
-    printf("%s", file_name);
+    printf("Sending file to client: %s", file_name);
     int foundFile = fileExists(file_name);
     if (!foundFile)
     {
@@ -965,8 +979,6 @@ void createProject(char *buffer, int clientSoc)
         printf("Success writing to the client.\n");
 
     /*free stuff*/
-    free(command);
-    free(new_command);
 }
 
 //=============================== READ CLIENT MESSAGE ======================
@@ -1080,10 +1092,26 @@ int read_len_message(int fd)
     return len;
 }
 
+void clean_up_code() {
+    printf("Clean up your code before exiting.\n");
+    pthread_exit(NULL);
+    exit(0);
+}
+
+/*Handing SIGINT*/
+void sig_handler(int signo){
+    if(signo == SIGINT){
+        printf("received SIGINT\n");
+        atexit(clean_up_code);
+        exit(0);
+    }
+}
+
 void *mainThread(void *arg)
 {
     int clientSock = *((int *)arg);
-    // /* Code to infinite read from server and disconnect when client sends DONE*/
+        
+    /* Code to infinite read from server and disconnect when client sends DONE*/
     while (1)
     {
         int len = read_len_message(clientSock);
@@ -1095,8 +1123,8 @@ void *mainThread(void *arg)
             free(buffer);
             break;
         }
-        else if(strcmp(buffer, "Incoming client connection ilab2 successful")==0){
-            block_write(clientSock, "23:Server got the message!", 26);
+        else if(strcmp(buffer, "Successfully connected to client.\n")==0){
+            block_write(clientSock, "34:Successfully connected to server.\n", 37);
         }
         else{
             parseRead(buffer, clientSock);
@@ -1137,6 +1165,11 @@ void set_up_connection(char *port)
     pthread_t thread;
     while (1)
     {
+        /*Handing SIGINT*/
+        if(signal(SIGINT, sig_handler) == SIG_ERR){
+            printf("ERROR cannot catch SIGINT.\n");
+        }
+
         /* Accept Client Connection = Blocking command */
         int clilen = sizeof(cli_addr);
         clientSoc = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
