@@ -55,16 +55,24 @@ char* getFileContent(char* file, char* flag);
 Boolean search_proj_exists(char* project_name);
   
 // Returns hostname for the local computer 
-void checkHostName(int hostname) ;
+void checkHostName(int hostname);
+
+// Returns host information corresponding to host name 
+void checkHostEntry(struct hostent * hostentry);
+  
+// Converts space-delimited IPv4 addresses 
+// to dotted-decimal format 
+void checkIPbuffer(char *IPbuffer);
   
 // Driver code 
-char* get_host_name(); 
+char* get_host_name();
 
+/*Returns the contents from the file requested from the client*/
 char *fetch_file_from_client(char *fileName, int clientSoc);
 
 //=============================== CURRENT VERSION ======================
 /*Returns the current version of a project as a string*/
-char* get_current_version(char* buffer, int clientSoc);
+char* get_current_version(char* buffer, int clientSoc, char flag);
 
 //=============================== ROLLBACK ======================
 //23:projectname:13

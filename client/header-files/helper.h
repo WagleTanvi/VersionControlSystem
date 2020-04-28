@@ -58,6 +58,10 @@ Boolean searchForProject(char* projectName);
 /* Method to non-blocking read a file and returns a string with contents of file */
 char* read_file(char* file);
 
+void fetchFile(char *buffer, int sockfd);
+
+void increment_manifest_version(char* project_name, int sockfd);
+
 //================================= FREE METHODS==================================================================
 /*Free 2d String array*/
 void free_string_arr(char** arr, int size);

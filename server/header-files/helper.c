@@ -49,14 +49,14 @@ char* getCommand(char* buffer){
     while(buffer[strcount]!=':'){
         strcount++;
     }
-    char* command = (char*)malloc(strcount+1*sizeof(char));
+    char* command = (char*)malloc(strcount*sizeof(char));
     command[0] = '\0';
     int i = 0;
     while(i < strcount){
         command[i] = buffer[i];
         i++;
     }
-    command[strcount+1] = '\0';
+    command[strcount] = '\0';
     return command;
 }
 
@@ -161,4 +161,82 @@ int number_of_lines(char* fileData){
         pos++;
     }
     return count;
+}
+
+// Returns hostname for the local computer 
+void checkHostName(int hostname) 
+{ 
+    if (hostname == -1) 
+    { 
+        perror("gethostname"); 
+    } 
+}
+
+// Returns host information corresponding to host name 
+void checkHostEntry(struct hostent * hostentry) 
+{ 
+    if (hostentry == NULL) 
+    { 
+        perror("gethostbyname"); 
+    } 
+} 
+  
+// Converts space-delimited IPv4 addresses 
+// to dotted-decimal format 
+void checkIPbuffer(char *IPbuffer) 
+{ 
+    if (NULL == IPbuffer) 
+    { 
+        perror("inet_ntoa"); 
+    } 
+} 
+  
+// Driver code 
+char* get_host_name()
+{ 
+    char hostbuffer[256]; 
+    char *IPbuffer; 
+    struct hostent *host_entry; 
+    int hostname; 
+  
+    // To retrieve hostname 
+    hostname = gethostname(hostbuffer, sizeof(hostbuffer)); 
+    checkHostName(hostname); 
+
+    // To retrieve host information 
+    host_entry = gethostbyname(hostbuffer); 
+    checkHostEntry(host_entry); 
+  
+    // To convert an Internet network 
+    // address into ASCII string 
+    IPbuffer = inet_ntoa(*((struct in_addr*) 
+                           host_entry->h_addr_list[0])); 
+  
+    return IPbuffer; 
+} 
+
+char *fetch_file_from_client(char *fileName, int clientSoc)
+{
+    char* cmd = (char*)malloc(strlen("sendfile")+1+digits(strlen(fileName))+1+strlen(fileName)*sizeof(char));
+    cmd[0] = '\0';
+    strcat(cmd, "sendfile");
+    strcat(cmd, ":");
+    strcat(cmd, to_Str(strlen(fileName)));
+    strcat(cmd, ":");
+    strcat(cmd, fileName);
+    char* ext_cmd = (char*)malloc(digits(strlen(cmd))+1*sizeof(char));
+    ext_cmd[0] = '\0';
+    strcat(ext_cmd, to_Str(strlen(cmd)));
+    strcat(ext_cmd, ":");
+    strcat(ext_cmd, cmd);
+    
+    block_write(clientSoc, ext_cmd, strlen(ext_cmd));
+    int messageLen = read_len_message(clientSoc);
+    char* clientData = block_read(clientSoc, messageLen);
+    if (strstr(clientData, "ERROR") != NULL) // check if errored (project name does not exist on server)
+    {
+        printf("%s", clientData);
+        return NULL;
+    }
+    return clientData;
 }

@@ -41,7 +41,7 @@ Record** create_record_struct(char* fileData, int size, char flag){
     if(flag == 'C') version = true;
     int pos = 0;
     int numberOfRecords = number_of_lines(fileData)+size;
-    Record** record_arr = (Record**) malloc(sizeof(Record*)*numberOfRecords);
+    Record** record_arr = (Record**) calloc(numberOfRecords, sizeof(Record*));
     int recordCount = 0;
     while (pos < strlen(fileData)){
         if (fileData[pos] == '\n'){

@@ -155,6 +155,76 @@ char* read_file(char* file){
     return NULL;
 }
 
+void fetchFile(char *buffer, int sockfd)
+{
+    printf("Sending File to server\n");
+    char *cmd = strtok(buffer, ":");
+    char *plens = strtok(NULL, ":");
+    char *file_name = strtok(NULL, ":");
+    printf("%s", file_name);
+    int foundFile = fileExists(file_name);
+    if (!foundFile)
+    {
+        free(file_name);
+        int n = write(sockfd, "40:ERROR the file does not exist on server.\n", 40);
+        if (n < 0)
+            printf("ERROR writing to the server.\n");
+        return;
+    }
+    char *content = read_file(file_name);
+    int contentLen = strlen(content);
+    int digLen = digits(contentLen);
+    int totalLen = digLen + contentLen + 1;
+    char *send = (char *)malloc(sizeof(char *) * totalLen + 1);
+    send[0] = '\0';
+    char *messageLen = to_Str(contentLen);
+    strcat(send, messageLen);
+    strcat(send, ":");
+    strcat(send, content);
+    printf("%s\n", content);
+    printf("%s\n", send);
+    block_write(sockfd, send, totalLen);
+}
+
+void increment_manifest_version(char* project_name, int sockfd){
+    // /*get client manifest*/
+    char *manifest = (char *)malloc(strlen(project_name) + strlen("./Manifest") * sizeof(char));
+    manifest[0] = '\0';
+    strcat(manifest, project_name);
+    strcat(manifest, "/.Manifest");
+    char *client_manifest_data = read_file(manifest);
+    Record **client_manifest = create_record_struct(client_manifest_data, true);
+    int size = getRecordStructSize(client_manifest);
+
+    /*re-make the manifest file*/
+    int new_manifest_file = open(manifest, O_WRONLY | O_CREAT | O_TRUNC, 0775);
+    int x = 0;
+    while (x < size)
+    {
+        if (x == 0)
+        {
+            char *new_vers = to_Str(atoi(client_manifest[0]->version) + 1);
+            write(new_manifest_file, new_vers, strlen(new_vers));
+            write(new_manifest_file, "\n", 1);
+        }
+        else
+        {
+            if (client_manifest[x] == NULL)
+            {
+                x++;
+                continue;
+            }
+            write(new_manifest_file, client_manifest[x]->version, strlen(client_manifest[x]->version));
+            write(new_manifest_file, " ", 1);
+            write(new_manifest_file, client_manifest[x]->file, strlen(client_manifest[x]->file));
+            write(new_manifest_file, " ", 1);
+            write(new_manifest_file, client_manifest[x]->hash, strlen(client_manifest[x]->hash));
+            write(new_manifest_file, "\n", 1);
+        }
+        x++;
+    }
+}
+
 //================================= FREE METHODS==================================================================
 /*Free 2d String array*/
 void free_string_arr(char** arr, int size){
