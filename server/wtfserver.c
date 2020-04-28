@@ -5,6 +5,215 @@ pthread_mutex_t mutex;
 
 int cmd_count = 0;
 
+//================== HELPER METHODS========================================
+/*Count digits in a number*/
+int digits(int n) {
+    int count = 0;
+    while (n != 0) {
+        n /= 10;     // n = n/10
+        ++count;
+    }
+    return count;
+}
+
+/*Returns a string converted number*/
+char* to_Str(int number){
+    char* num_str = (char*)malloc(digits(number)+1*sizeof(char));
+    snprintf(num_str, digits(number)+1, "%d", number);
+    num_str[digits(number)] = '\0';
+    return num_str;
+}
+
+/* Check if malloc data is null */
+void check_malloc_null(void* data){
+    if ((char*) data == NULL ){
+        // malloc is null
+        printf("Could not allocate memory\n");
+        exit(1);
+    }
+}
+
+/*Get substring of a string*/
+char* getSubstring(int bcount, char* buffer, int nlen){
+    char* substr = (char*)malloc(nlen+1*sizeof(char));
+    check_malloc_null(substr);    
+    int count = 0;
+    while(count < nlen){
+        substr[count]=buffer[bcount];
+        count++;
+        bcount++;
+    }
+    substr[nlen] = '\0';
+    return substr;
+}
+
+/*Makes directory and all subdirectories*/
+void mkdir_recursive(const char *path){
+    char *subpath, *fullpath;
+    fullpath = strdup(path);
+    subpath = dirname(fullpath);
+    if (strlen(subpath) > 1)
+        mkdir_recursive(subpath);
+    int n = mkdir(path, 0775);
+    if(n < 0){
+        if(errno != 17){
+            printf("ERROR unable to make directory: %s\n", strerror(errno));
+        }
+    }
+    free(fullpath);
+}
+
+/*Return string of file content*/
+char* getFileContent(char* file, char* flag){
+    int fd = open(file, O_RDONLY);
+    if(fd == -1){
+        printf("ERROR opening file: %s\n", strerror(errno));
+        return NULL;
+    }
+    struct stat stats;
+    if(stat(file, &stats) == 0){
+        int fileSize = stats.st_size; 
+        char* buffer = (char*)malloc(fileSize+1 * sizeof(char));
+        check_malloc_null(buffer);
+        int status = 0;    
+        int readIn = 0;
+        do{
+            status = read(fd, buffer+readIn, fileSize);
+            readIn += status;
+        } while (status > 0 && readIn < fileSize);
+        buffer[fileSize] = '\0';
+        close(fd);
+
+        /*Append the necessary flag!*/
+        if(strcmp(flag, "")==0) 
+            return buffer;
+        else{
+            char f[2] = "C\0";
+            char* new_buffer = (char*)malloc(strlen(buffer)+2*sizeof(char));
+            check_malloc_null(new_buffer);
+            int i = 0;
+            while(i < 2){
+                new_buffer[i] = f[i];
+                i++;
+            }
+            strcat(new_buffer, buffer);
+            return new_buffer;
+        }
+    }
+    close(fd);
+    printf("Warning: stat error. \n");
+    return NULL; 
+}
+
+/*Returns if server has the given project - needs the full path.*/
+Boolean search_proj_exists(char* project_name){    
+    char path[4096];
+    struct dirent *d;
+    DIR *dir = opendir("./");
+    if (dir == NULL){
+        return false;
+    }    
+    while ((d = readdir(dir)) != NULL) {
+        if(strcmp(d->d_name, project_name)==0){
+            closedir(dir);
+            return true;
+        }
+    }
+    closedir(dir);
+    return false;
+}
+
+/* Returns number of lines in file */
+int number_of_lines(char* fileData){
+    int count = 0;
+    int pos = 0;
+    while (pos < strlen(fileData)){
+        if (fileData[pos] == '\n'){
+            count++;
+        }
+        pos++;
+    }
+    return count;
+}
+
+// Returns hostname for the local computer 
+void checkHostName(int hostname) 
+{ 
+    if (hostname == -1) 
+    { 
+        perror("gethostname"); 
+    } 
+}
+
+// Returns host information corresponding to host name 
+void checkHostEntry(struct hostent * hostentry) 
+{ 
+    if (hostentry == NULL) 
+    { 
+        perror("gethostbyname"); 
+    } 
+} 
+  
+// Converts space-delimited IPv4 addresses 
+// to dotted-decimal format 
+void checkIPbuffer(char *IPbuffer) 
+{ 
+    if (NULL == IPbuffer) 
+    { 
+        perror("inet_ntoa"); 
+    } 
+} 
+  
+// Driver code 
+char* get_host_name()
+{ 
+    char hostbuffer[256]; 
+    char *IPbuffer; 
+    struct hostent *host_entry; 
+    int hostname; 
+  
+    // To retrieve hostname 
+    hostname = gethostname(hostbuffer, sizeof(hostbuffer)); 
+    checkHostName(hostname); 
+
+    // To retrieve host information 
+    host_entry = gethostbyname(hostbuffer); 
+    checkHostEntry(host_entry); 
+  
+    // To convert an Internet network 
+    // address into ASCII string 
+    IPbuffer = inet_ntoa(*((struct in_addr*) 
+                           host_entry->h_addr_list[0])); 
+  
+    return IPbuffer; 
+} 
+
+char *fetch_file_from_client(char *fileName, int clientSoc)
+{
+    char* cmd = (char*)malloc(strlen("sendfile")+1+digits(strlen(fileName))+1+strlen(fileName)*sizeof(char));
+    cmd[0] = '\0';
+    strcat(cmd, "sendfile");
+    strcat(cmd, ":");
+    strcat(cmd, to_Str(strlen(fileName)));
+    strcat(cmd, ":");
+    strcat(cmd, fileName);
+    char* ext_cmd = (char*)malloc(digits(strlen(cmd))+1*sizeof(char));
+    ext_cmd[0] = '\0';
+    strcat(ext_cmd, to_Str(strlen(cmd)));
+    strcat(ext_cmd, ":");
+    strcat(ext_cmd, cmd);
+    
+    block_write(clientSoc, ext_cmd, strlen(ext_cmd));
+    int messageLen = read_len_message(clientSoc);
+    char* clientData = block_read(clientSoc, messageLen);
+    if (strstr(clientData, "ERROR") != NULL) // check if errored (project name does not exist on server)
+    {
+        printf("%s", clientData);
+        return NULL;
+    }
+    return clientData;
+}
+
 //=============================== HISTORY ======================
 /* Not tested */
 void save_history(char *commitData, char *projectName, char *version)
@@ -369,6 +578,7 @@ void push_commits(char *buffer, int clientSoc)
             }
             pthread_mutex_lock(&mutex);
             // write content to file
+            mkdir_recursive(filepath);
             int fd = open(filepath, O_WRONLY | O_TRUNC);
             if (fd == -1)
             {
@@ -413,6 +623,7 @@ void push_commits(char *buffer, int clientSoc)
             {
                 return;
             }
+            mkdir_recursive(filepath);
             // write content to file
             int fd = open(filepath, O_WRONLY | O_CREAT | O_TRUNC, 00600);
             if (fd == -1)
@@ -482,6 +693,13 @@ void push_commits(char *buffer, int clientSoc)
 
     /*tell the client that push was successful*/
     block_write(clientSoc, "32:Server has successfully pushed.\0", 35);
+
+    /*free stuff*/
+//     free(pserver);
+//     free(manifestpath);
+//     free(history_dir);
+//     free(new_project_name);
+//     free(new_project_path);
 }
 
 //=============================== COMMIT ======================
@@ -546,6 +764,10 @@ void create_commit_file(char *buffer, int clientSoc)
     file_content[atoi(size)] = '\0';
     write(commitFile, file_content, atoi(size));
     //block_write(clientSoc, "42:Server has successfully made commit file.\0", 45);
+
+    // free(pending_commits);
+    // free(pserver);
+    // free(file_content);
 }
 
 //===============================GET MANIFEST======================
@@ -693,6 +915,8 @@ void fetchFile(char *buffer, int clientSoc, char *command)
     printf("%s\n", content);
     printf("%s\n", send);
     block_write(clientSoc, send, totalLen);
+
+    free(send);
 }
 
 //=============================== DESTROY ======================
@@ -904,28 +1128,25 @@ void createProject(char *buffer, int clientSoc)
     /*parse through the buffer*/
     int bcount = 0;
     char *cmd = strtok(buffer, ":");
-    bcount += strlen(cmd) + 1;
     char *plens = strtok(NULL, ":");
-    bcount += strlen(plens) + 1;
+    bcount += strlen(cmd) + 1 + strlen(plens) + 1;
     int pleni = atoi(plens);
     char *project_name = getSubstring(bcount, buffer, pleni);
     int foundProj = search_proj_exists(project_name);
 
-    /*create project in server*/
     if (strcmp(cmd, "create") == 0)
     {
         /*check to see if project already exists on server*/
         if (foundProj == 1)
         {
             free(project_name);
-            int n = write(clientSoc, "ERROR the project already exists on server.\n", 30);
-            if (n < 0)
-                printf("ERROR writing to the client.\n");
+            block_write(clientSoc, "43:ERROR the project already exists on server.", 46);
             return;
         }
 
         /*make project folder and set permissions*/
-        char *pserver = (char *)malloc(strlen(project_name) + strlen("/.Manifest"));
+        char *pserver = (char *)malloc(strlen(project_name) + strlen("/.Manifest")+1);
+        check_malloc_null(pserver);
         pserver[0] = '\0';
         strcat(pserver, project_name);
         mkdir_recursive(pserver);
@@ -939,15 +1160,17 @@ void createProject(char *buffer, int clientSoc)
         if (manifestFile < 0)
         {
             printf("ERROR unable to make manifestFile: %s\n", strerror(errno));
+            return;
         }
         write(manifestFile, "1\n", 2);
+        free(pserver);
     }
     else if (strcmp(cmd, "checkout") == 0)
     {
         if (foundProj == 0)
         {
             free(project_name);
-            int n = write(clientSoc, "ERROR project not in the server.\n", 36);
+            int n = write(clientSoc, "44:ERROR project does not exist in the server.\n", 47);
             if (n < 0)
                 printf("ERROR writing to the client.\n");
             return;
@@ -962,23 +1185,20 @@ void createProject(char *buffer, int clientSoc)
     strcat(command, ":");
     command = checkoutProject(command, project_name, clientSoc);
 
-    /*add the length of the full commmand to the front of the protocol*/
-    int cmd_length = strlen(command);
-    char *cmd_len_str = to_Str(cmd_length);
-    char *new_command = (char *)malloc(strlen(cmd_len_str) + cmd_length + 1 * sizeof(char));
+    /*add the length of the full commmand to the front of the protocol*/    
+    char *new_command = (char *)malloc(digits(strlen(command)) + strlen(command) + 1 * sizeof(char));
     new_command[0] = '\0';
-    strcat(new_command, cmd_len_str);
+    strcat(new_command, to_Str(strlen(command)));
     strcat(new_command, ":");
     strcat(new_command, command);
-
     /*write command to client*/
     int n = write(clientSoc, new_command, strlen(new_command));
     if (n < 0)
         printf("ERROR writing to the client.\n");
-    else
-        printf("Success writing to the client.\n");
 
     /*free stuff*/
+    free(command);
+    free(new_command);
 }
 
 //=============================== READ CLIENT MESSAGE ======================
@@ -988,9 +1208,20 @@ void parseRead(char *buffer, int clientSoc)
     if (strstr(buffer, ":") != 0)
     {
         //figure out the command
-        char *command = getCommand(buffer);
-        //printf("Command: %s\n", command);
-        if (strcmp(command, "create") == 0 || strcmp(command, "checkout") == 0)
+        int strcount = 0;
+        while(buffer[strcount]!=':'){
+            strcount++;
+        }
+        char* command = (char*)malloc(strcount+1*sizeof(char));
+        check_malloc_null(command);
+        int i = 0;
+        while(i < strcount){
+            command[i] = buffer[i];
+            i++;
+        }
+        command[strcount] = '\0';
+
+        if (strcmp(command, "create")==0 || strcmp(command, "checkout")==0)
         {
             createProject(buffer, clientSoc);
         }
@@ -1067,8 +1298,7 @@ void block_write(int fd, char *data, int targetBytes)
 
 int read_len_message(int fd)
 {
-    //printf("um");
-    char *buffer = (char *)malloc(sizeof(char) * 50);
+    char buffer[50];
     bzero(buffer, 50);
     int status = 0;
     int readIn = 0;
@@ -1077,24 +1307,19 @@ int read_len_message(int fd)
         status = read(fd, buffer + readIn, 1);
         readIn += status;
     } while (buffer[readIn - 1] != ':' && status > 0);
-    char *num = (char *)malloc(sizeof(char) * strlen(buffer));
+    char num[20];
     int i = 0;
     while(i < strlen(buffer)){
         num[i] = buffer[i];
         i++;
     }
     num[strlen(buffer)] = '\0';
-    // strncpy(num, buffer, strlen(buffer) - 1);
-    // num[strlen(buffer) - 1] = '\0';
-    // free(buffer);
-    int len = atoi(num); // - strlen(num) - 1;
-    free(num);
+    int len = atoi(num);
     return len;
 }
 
 void clean_up_code() {
     printf("Clean up your code before exiting.\n");
-    pthread_exit(NULL);
     exit(0);
 }
 
@@ -1178,6 +1403,7 @@ void set_up_connection(char *port)
         }
         else{
             pthread_create(&thread, NULL, mainThread, &clientSoc);
+            pthread_detach(thread);
         }
     }
 }

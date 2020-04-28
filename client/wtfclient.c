@@ -960,7 +960,7 @@ int read_configure_and_connect()
 }
 
 /*Sending command to create project in server. Returns the fd*/
-int write_to_server(int sockfd, char *argv1, char *argv2, char *project_name)
+void write_to_server(int sockfd, char *argv1, char *argv2, char *project_name)
 {
     int clen = strlen(argv2) + digits(strlen(project_name)) + strlen(argv1) + 2;
     char *command = (char *)malloc(clen + 1 * sizeof(char));
@@ -971,11 +971,7 @@ int write_to_server(int sockfd, char *argv1, char *argv2, char *project_name)
     strcat(new_command, to_Str((strlen(command))));
     strcat(new_command, ":");
     strcat(new_command, command);
-    int n = write(sockfd, new_command, strlen(new_command));
-
-    free(command);
-    free(new_command);
-    return n;
+    block_write(sockfd, new_command, strlen(new_command));
 }
 
 /*Returns the buffer from the server*/
@@ -999,12 +995,10 @@ int main(int argc, char **argv)
     else if (argc == 3 && (strcmp(argv[1], "create") == 0 || strcmp(argv[1], "checkout") == 0))
     {
         sockfd = read_configure_and_connect();
-        int n = write_to_server(sockfd, argv[1], argv[2], argv[2]);
-        if (n < 0)
-            printf("ERROR writing to socket.\n");
-        else
-        {
-            char *buffer = read_from_server(sockfd);
+        write_to_server(sockfd, argv[1], argv[2], argv[2]);
+        
+        char *buffer = read_from_server(sockfd);
+        if(strcmp(buffer, "ERROR the project already exists on server.")!=0){
             parseBuffer_create(buffer);
         }
         /*disconnect server at the end!*/
@@ -1015,13 +1009,8 @@ int main(int argc, char **argv)
     else if (argc == 3 && (strcmp(argv[1], "destroy") == 0))
     {
         sockfd = read_configure_and_connect();
-        int n = write_to_server(sockfd, argv[1], argv[2], argv[2]);
-        if (n < 0)
-            printf("ERROR writing to socket.\n");
-        else
-        {
-            char *buffer = read_from_server(sockfd);
-        }
+        write_to_server(sockfd, argv[1], argv[2], argv[2]);
+        char *buffer = read_from_server(sockfd);
         /*disconnect server at the end!*/
         block_write(sockfd, "4:Done", 4);
         printf("Client Disconnecting");
@@ -1080,14 +1069,9 @@ int main(int argc, char **argv)
     else if (argc == 3 && (strcmp(argv[1], "commit") == 0))
     {
         sockfd = read_configure_and_connect();
-        int n = write_to_server(sockfd, "manifest", argv[2], argv[2]);
-        if (n < 0)
-            printf("ERROR writing to socket.\n");
-        else
-        {
-            char* buffer = read_from_server(sockfd);
-            write_commit_file(sockfd, argv[2], buffer);
-        } 
+        write_to_server(sockfd, "manifest", argv[2], argv[2]);
+        char* buffer = read_from_server(sockfd);
+        write_commit_file(sockfd, argv[2], buffer);
     }
     else if (argc == 3 && (strcmp(argv[1], "push") == 0))
     {
@@ -1120,23 +1104,19 @@ int main(int argc, char **argv)
         strcat(sec_cmd, manifest_file_content);
 
         /*write to the server*/
-        int n = write_to_server(sockfd, argv[1], sec_cmd, argv[2]);
-        if (n < 0)
-            printf("ERROR writing to socket.\n");
-        else{
-            while(1){
+        write_to_server(sockfd, argv[1], sec_cmd, argv[2]);
+        while(1){
+            char* buffer = read_from_server(sockfd);
+            if(strstr(buffer, "sendfile")!=NULL){
+                fetchFile(buffer, sockfd);
                 char* buffer = read_from_server(sockfd);
-                if(strstr(buffer, "sendfile")!=NULL){
-                    fetchFile(buffer, sockfd);
-                    char* buffer = read_from_server(sockfd);
-                    fetchFile(buffer, sockfd);
-                    continue;
-                } 
-                else if(strcmp(buffer, "Server has successfully pushed.\0")==0){
-                    remove_commit_file(sockfd, argv[2]);
-                    increment_manifest_version(argv[2], sockfd);
-                    break;
-                }
+                fetchFile(buffer, sockfd);
+                continue;
+            } 
+            else if(strcmp(buffer, "Server has successfully pushed.\0")==0){
+                remove_commit_file(sockfd, argv[2]);
+                increment_manifest_version(argv[2], sockfd);
+                break;
             }
         }
     }
@@ -1149,12 +1129,8 @@ int main(int argc, char **argv)
         strcat(sec_cmd, to_Str(strlen(argv[3])));
         strcat(sec_cmd, ":");
         strcat(sec_cmd, argv[3]); //version number
-        int n = write_to_server(sockfd, "rollback", sec_cmd, argv[2]);
-        if(n < 0)
-            printf("ERROR writing to socket.\n");
-        else{
-            char* buffer = read_from_server(sockfd);
-        }
+        write_to_server(sockfd, "rollback", sec_cmd, argv[2]);
+        char* buffer = read_from_server(sockfd);
         block_write(sockfd, "4:Done", 6);
         printf("Client Disconnecting\n");
         close(sockfd);
@@ -1162,12 +1138,8 @@ int main(int argc, char **argv)
     else if(argc == 3 && (strcmp(argv[1], "currentversion")==0))
     {
         sockfd = read_configure_and_connect();
-        int n = write_to_server(sockfd, "currentversion", argv[2], argv[2]);
-        if(n < 0)
-            printf("ERROR writing to socket.\n");
-        else{
-            char* buffer = read_from_server(sockfd);
-        }
+        write_to_server(sockfd, "currentversion", argv[2], argv[2]);
+        char* buffer = read_from_server(sockfd);
         block_write(sockfd, "4:Done", 6);
         printf("Client Disconnecting\n");
         close(sockfd);
