@@ -1,24 +1,27 @@
 #include "header-files/helper.h"
 #include "header-files/record.h"
 
-int cmd_count = 0;
+pthread_mutex_t mutex;
 
+int cmd_count = 0;
 
 //=============================== HISTORY ======================
 /* Not tested */
 void save_history(char *commitData, char *projectName, char *version)
 {
-    char *filePath = (char *)malloc(strlen(projectName) + 1 + 9);
-    strcpy(filePath, projectName);
+    char *filePath = (char *)malloc(strlen(projectName)+strlen("/.History") * sizeof(int));
+    filePath[0] = '\0';
+    strcat(filePath, projectName);
     strcat(filePath, "/.History");
-    int fd = open(filePath, O_WRONLY | O_CREAT, 00600);
+    int fd = open(filePath, O_WRONLY | O_CREAT | O_APPEND, 00600);
     if (fd == -1)
     {
         printf("Fatal Error: Could not open History file");
+        return;
     }
     write(fd, version, strlen(version));
     write(fd, "\n", 1);
-    write(fd, commitData, strlen(version));
+    write(fd, commitData, strlen(commitData));
     free(filePath);
 }
 
@@ -71,13 +74,7 @@ char *get_current_version(char *buffer, int clientSoc, char flag)
 
 //=============================== ROLLBACK ======================
 /*Returns a string to send to current version*/
-char* current_version_format(char* project_name, char* dir_name){
-    char* req_dir = (char*)malloc(strlen(project_name)+1+strlen("history")+1+strlen(dir_name));
-    req_dir[0] = '\0';
-    strcat(req_dir, project_name);
-    strcat(req_dir, "/history/");
-    strcat(req_dir, dir_name);
-
+char* current_version_format(char* req_dir){
     char* formatted = (char*)malloc(strlen("currentversion")+1+digits(strlen(req_dir))+1+strlen(req_dir));
     formatted[0] = '\0';
     strcat(formatted, "currentversion:");
@@ -140,7 +137,12 @@ void rollback(char *buffer, int clientSoc)
             continue;
         if (d->d_type == DT_DIR)
         {
-            char* format_str = current_version_format(project_name, d->d_name);
+            char* req_dir = (char*)malloc(strlen(project_name)+1+strlen("history")+1+strlen(d->d_name));
+            req_dir[0] = '\0';
+            strcat(req_dir, project_name);
+            strcat(req_dir, "/history/");
+            strcat(req_dir, d->d_name);
+            char* format_str = current_version_format(req_dir);
             int version_num = atoi(get_current_version(format_str, clientSoc, 'H'));
             if (version_num == req_version)
             {
@@ -178,6 +180,7 @@ void rollback(char *buffer, int clientSoc)
     strcat(proj_to_destroy, project_name);
     destroyProject(proj_to_destroy, clientSoc);
 
+    /*Renaming doesn't work for some reason >__<*/
     int r = rename(new_project_name, project_name);
     if(r != 0){
         printf("ERROR renaming directory.\n");
@@ -276,6 +279,9 @@ void push_commits(char *buffer, int clientSoc)
     //     return;
     // }
     int num = number_of_lines(server_file_content);
+    char* format_str = current_version_format(project_name);
+    char* version_num = get_current_version(format_str, clientSoc, 'N');
+    save_history(server_file_content, project_name, version_num);
 
     /*Get the manifest file data*/
     count = bcount;
@@ -297,11 +303,6 @@ void push_commits(char *buffer, int clientSoc)
     char *manifest_data = getFileContent(manifestpath, "");
     Record **server_manifest = create_record_struct(manifest_data, num, 'M');
     int server_manifest_size = getRecordStructSize(server_manifest);
-    // int i = number_of_lines(manifest_data);
-    // while(i < server_manifest_size){
-    //     server_manifest[i] = NULL;
-    //     i++;
-    // }
 
     /*Get the client manifest- make it into a record struct*/
     Record **client_manifest = create_record_struct(file_content2, 0, 'M');
@@ -744,7 +745,11 @@ void destroyProject(char *buffer, int clientSoc)
     char *pserver = (char *)malloc(strlen(project_name));
     pserver[0] = '\0';
     strcat(pserver, project_name);
+
+    /*mutex lock here????*/
+    pthread_mutex_lock(&mutex);
     int r = remove_directory(pserver);
+    pthread_mutex_unlock(&mutex);
 
     /*Send message to client*/
     if (r < 0)
@@ -1082,11 +1087,8 @@ void *mainThread(void *arg)
     while (1)
     {
         int len = read_len_message(clientSock);
-        //printf("Recieved Message of Length: %d\n", len);
         char *buffer = block_read(clientSock, len);
         if(buffer == NULL) continue;
-        //printf("The buffer is: %s\n", buffer);
-        //printf("Message from Client: %s\n", buffer);
         if (strcmp(buffer, "Done") == 0)
         {
             printf("Client Disconnected\n");
@@ -1096,14 +1098,11 @@ void *mainThread(void *arg)
         else if(strcmp(buffer, "Incoming client connection ilab2 successful")==0){
             block_write(clientSock, "23:Server got the message!", 26);
         }
-        else
-        {
-            /*Parse through the buffer*/
+        else{
             parseRead(buffer, clientSock);
         }
         free(buffer);
     }
-    // do I close server listening socket? Idts
     printf("Server Disconnected\n");
     close(clientSock);
     pthread_exit(NULL);
@@ -1131,21 +1130,22 @@ void set_up_connection(char *port)
     listen(sockfd, 10);
     printf("Server Listening\n");
 
+    /*Initialize the mutex*/
+    pthread_mutex_init(&mutex, NULL);
+
+    /*For every client that connects - throw it into a newthread*/
     pthread_t thread;
     while (1)
     {
         /* Accept Client Connection = Blocking command */
         int clilen = sizeof(cli_addr);
         clientSoc = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
-        if (clientSoc < 0)
-        {
+        if (clientSoc < 0){
             printf("ERROR on accept");
         }
-        else
-        {
+        else{
             pthread_create(&thread, NULL, mainThread, &clientSoc);
         }
-
     }
 }
 
