@@ -1,7 +1,11 @@
 #include "header-files/helper.h"
 #include "header-files/record.h"
 
-pthread_mutex_t mutex;
+/*Create a struct that holds the project name and the mutex. Basically a hashmap that links project name with a mutex.*/
+typedef struct MutexArray{
+    char* projectName;
+    pthread_mutex_t mutex;
+} MutexArray;
 
 int cmd_count = 0;
 
@@ -455,7 +459,7 @@ void duplicate_dir(char *project_path, char *new_project_path)
 //push:23:projectname:234:blahblahcommintcontent
 void push_commits(char *buffer, int clientSoc)
 {
-    /*get project name and check if the project exists in the server*/
+    /*get project name*/ 
     int bcount = 0;
     char *cmd = strtok(buffer, ":");
     bcount += strlen(cmd) + 1;
@@ -463,10 +467,12 @@ void push_commits(char *buffer, int clientSoc)
     bcount += strlen(plens) + 1;
     int pleni = atoi(plens);
     char *project_name = getSubstring(bcount, buffer, pleni);
+
+    /*check if the project exists in the server*/
     int foundProj = search_proj_exists(project_name);
     if (foundProj == 0)
     {
-        //free(project_name);
+        free(project_name);
         int n = write(clientSoc, "ERROR project not in the server.\n", 36);
         if (n < 0)
             printf("ERROR writing to the client.\n");
@@ -476,8 +482,7 @@ void push_commits(char *buffer, int clientSoc)
     /*Get the commit file data*/
     bcount += (strlen(project_name) + 1);
     int count = bcount;
-    while (buffer[count] != ':')
-    {
+    while (buffer[count] != ':'){
         count++;
     }
     int nlen = count - bcount;
@@ -485,6 +490,7 @@ void push_commits(char *buffer, int clientSoc)
     bcount += (strlen(size) + 1);
     char *file_content = getSubstring(bcount, buffer, atoi(size));
     bcount += (strlen(file_content) + 1);
+    free(size);
 
     /*Get server commit file and compare with the client commit file*/
     char* hostname = get_host_name();
@@ -494,14 +500,16 @@ void push_commits(char *buffer, int clientSoc)
     strcat(pserver, "/pending-commits/.Commit-");
     strcat(pserver, hostname);
     char* server_file_content = getFileContent(pserver, "");
-    // if(strcmp(file_content, server_file_content)!=0){
-    //     printf("ERROR the client and sever commit files do not match.\n");
-    //     return;
-    // }
+    if(strcmp(file_content, server_file_content)!=0){
+        printf("ERROR the client and sever commit files do not match.\n");
+        return;
+    }
     int num = number_of_lines(server_file_content);
     char* format_str = current_version_format(project_name);
     char* version_num = get_current_version(format_str, clientSoc, 'N');
     save_history(server_file_content, project_name, version_num);
+    free(server_file_content);
+    free(format_str);
 
     /*Get the manifest file data*/
     count = bcount;
@@ -514,6 +522,7 @@ void push_commits(char *buffer, int clientSoc)
     bcount += (strlen(size2) + 1);
     char *file_content2 = getSubstring(bcount, buffer, atoi(size2));
     bcount += (strlen(file_content2) + 1);
+    free(size2);
 
     /*Get the current server manifest that is in the folder*/
     char *manifestpath = (char *)malloc(strlen(project_name) + strlen("./Manifest") * sizeof(char));
@@ -577,7 +586,7 @@ void push_commits(char *buffer, int clientSoc)
             {
                 return;
             }
-            pthread_mutex_lock(&mutex);
+            //pthread_mutex_lock(&mutex);
             // write content to file
             mkdir_recursive(filepath);
             int fd = open(filepath, O_WRONLY | O_TRUNC);
@@ -586,7 +595,7 @@ void push_commits(char *buffer, int clientSoc)
                 printf("Fatal Error: Could not open Update file");
             }
             block_write(fd, newContent, strlen(newContent));
-            pthread_mutex_unlock(&mutex);
+            //pthread_mutex_unlock(&mutex);
         }
         else if (strcmp(active_commit[x]->version, "A") == 0)
         { //add file
@@ -635,7 +644,7 @@ void push_commits(char *buffer, int clientSoc)
         }
         else if (strcmp(active_commit[x]->version, "D") == 0)
         { //delete file
-            pthread_mutex_lock(&mutex);
+            //pthread_mutex_lock(&mutex);
             char *filepath = active_commit[x]->file;
             x = 1;
             int size = getRecordStructSize(server_manifest);
@@ -651,7 +660,7 @@ void push_commits(char *buffer, int clientSoc)
                 x++;
             }
             int r = remove(filepath);
-            pthread_mutex_unlock(&mutex);
+            //pthread_mutex_unlock(&mutex);
 
         }
         else
@@ -696,6 +705,10 @@ void push_commits(char *buffer, int clientSoc)
     block_write(clientSoc, "32:Server has successfully pushed.\0", 35);
 
     /*free stuff*/
+    free(file_content);
+    free(file_content2);
+    free(pserver);
+    free(manifestpath);
 //     free(pserver);
 //     free(manifestpath);
 //     free(history_dir);
@@ -706,7 +719,7 @@ void push_commits(char *buffer, int clientSoc)
 //=============================== COMMIT ======================
 void create_commit_file(char *buffer, int clientSoc)
 {
-    /*get project name and check if the project exists in the server*/
+    /*get project name*/
     int bcount = 0;
     char *cmd = strtok(buffer, ":");
     bcount += strlen(cmd) + 1;
@@ -714,6 +727,8 @@ void create_commit_file(char *buffer, int clientSoc)
     bcount += strlen(plens) + 1;
     int pleni = atoi(plens);
     char *project_name = getSubstring(bcount, buffer, pleni);
+
+    /*Check that the project exists on server*/
     int foundProj = search_proj_exists(project_name);
     if (foundProj == 0)
     {
@@ -743,7 +758,11 @@ void create_commit_file(char *buffer, int clientSoc)
     int commitFile = open(pserver, O_WRONLY | O_CREAT | O_TRUNC, 0775);
     if (commitFile < 0)
     {
+        free(project_name);
+        free(pending_commits);
+        free(pserver);
         printf("ERROR unable to make commit file: %s\n", strerror(errno));
+        return;
     }
 
     /*write the commit file content to the file*/
@@ -764,11 +783,12 @@ void create_commit_file(char *buffer, int clientSoc)
     }
     file_content[atoi(size)] = '\0';
     write(commitFile, file_content, atoi(size));
-    //block_write(clientSoc, "42:Server has successfully made commit file.\0", 45);
 
-    // free(pending_commits);
-    // free(pserver);
-    // free(file_content);
+    free(project_name);
+    free(pending_commits);
+    free(pserver);
+    free(size);
+    free(file_content);
 }
 
 //===============================GET MANIFEST======================
@@ -866,7 +886,6 @@ void fetchServerManifest(char *buffer, int clientSoc)
         printf("ERROR cannot find Manifest file./\n");
     }
     free(project_name);
-    //free(pserver);
 }
 /* Returns true if file exists in project */
 Boolean fileExists(char *fileName)
@@ -897,7 +916,6 @@ void fetchFile(char *buffer, int clientSoc, char *command)
     int foundFile = fileExists(file_name);
     if (!foundFile)
     {
-        free(file_name);
         int n = write(clientSoc, "40:ERROR the file does not exist on server.\n", 40);
         if (n < 0)
             printf("ERROR writing to the client.\n");
@@ -917,6 +935,8 @@ void fetchFile(char *buffer, int clientSoc, char *command)
     printf("%s\n", send);
     block_write(clientSoc, send, totalLen);
 
+    free(content);
+    free(messageLen);
     free(send);
 }
 
@@ -928,8 +948,7 @@ int remove_directory(char *dirPath)
     char path[4096];
     struct dirent *d;
     DIR *dir = opendir(dirPath);
-    if (dir == NULL)
-    {
+    if (dir == NULL){
         printf("ERROR this is not a directory.\n");
         return -1;
     }
@@ -940,19 +959,16 @@ int remove_directory(char *dirPath)
         snprintf(path, 4096, "%s/%s", dirPath, d->d_name);
         if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0)
             continue;
-        if (d->d_type == DT_DIR)
-        {
+        if (d->d_type == DT_DIR){
             r2 = remove_directory(path);
         }
-        else
-        {
+        else{
             r2 = unlink(path);
         }
         r = r2;
     }
     closedir(dir);
-    if (r == 0)
-    {
+    if (r == 0){
         r = rmdir(dirPath);
     }
     return 0;
@@ -986,23 +1002,23 @@ void destroyProject(char *buffer, int clientSoc)
     strcat(pserver, project_name);
 
     /*mutex lock here????*/
-    pthread_mutex_lock(&mutex);
+    //pthread_mutex_lock(&mutex);
     int r = remove_directory(pserver);
-    pthread_mutex_unlock(&mutex);
+    //pthread_mutex_unlock(&mutex);
+
+    free(project_name);
+    free(pserver);
 
     /*Send message to client*/
     if (r < 0)
         printf("ERROR traversing directory.\n");
     else
     {
-        free(project_name);
         int n = write(clientSoc, "Successfully destroyed project.\n", 33);
         if (n < 0)
             printf("ERROR writing to the client.\n");
         return;
     }
-
-    free(pserver);
 }
 
 //=============================== CHECKOUT ======================
@@ -1401,11 +1417,20 @@ void set_up_connection(char *port)
     listen(sockfd, 10);
     printf("Server Listening\n");
 
-    /*Initialize the mutex*/
-    pthread_mutex_init(&mutex, NULL);
-
-    /*For every client that connects - throw it into a newthread*/
-    pthread_t thread;
+    /*Initialize the mutex array structure*/
+    int num_of_projects = find_all_projects();
+    char* projectNames = get_project_names();
+    MutexArray* array_of_mutexes = (MutexArray*)(num_of_projects*sizeof(MutexArray));
+    int i = 0;
+    while(i < num_of_projects){
+        array_of_mutexes[i]->projectName = projectNames[i];
+        pthread_mutex_init(&(array_of_mutexes[i]->mutex), NULL);
+        i++;
+    }
+        
+    /*For every client that connects - throw it into a new thread*/
+    pthread_t tid[10];  
+    i = 0; 
     while (1)
     {
         /*Handing SIGINT*/
@@ -1417,13 +1442,31 @@ void set_up_connection(char *port)
         int clilen = sizeof(cli_addr);
         clientSoc = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
         if (clientSoc < 0){
-            printf("ERROR on accept");
+            printf("ERROR on accept\n");
         }
         else{
-            pthread_create(&thread, NULL, mainThread, &clientSoc);
+            int error = pthread_create(&tid[i], NULL, mainThread, &clientSoc);
+            if(error < 0){
+                printf("ERROR unable to create thread.\n");
+            }
+            i++;
             pthread_detach(thread);
         }
     }
+
+    /*Join all the threads*/
+    int j = 0;
+    while(j < i){
+        pthread_join(tid[i], NULL);
+    }
+
+    /*destroy the mutex array*/
+    i = 0;
+    while(i < 5){
+        pthread_mutex_destroy(&mutexes[i]); 
+        i++;
+    }
+    
 }
 
 /* This method disconnects from client if necessary in the future*/
