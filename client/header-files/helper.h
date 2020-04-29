@@ -130,7 +130,7 @@ void write_configure(char *hostname, char *port);
 int read_configure_and_connect();
 
 /*Sending command to create project in server. Returns the fd*/
-int write_to_server(int sockfd, char* argv1, char* argv2, char* project_name);
+void write_to_server(int sockfd, char* argv1, char* argv2, char* project_name);
 
 /*Returns the buffer from the server*/
 char *read_from_server(int sockfd);

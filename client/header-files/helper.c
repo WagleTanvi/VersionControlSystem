@@ -1,10 +1,6 @@
 #include "helper.h"
 #include "record.h"
 
-//================== PROTOTYPES===========================================
-
-void block_write(int fd, char *data, int targetBytes);
-
 //==================== HELPER METHODS ================================
 /*Count digits in a number*/
 int digits(int n)
@@ -106,7 +102,7 @@ Boolean fileExists(char* fileName){
     if(fd == -1){
         //printf("Fatal Error: %s named %s\n", strerror(errno), file);
         //close(fd);
-        printf("Fatal Error: %s does not exist\n", fileName);
+        //printf("%s does not exist\n", fileName);
         return false;
     }
     close(fd); 
@@ -157,11 +153,10 @@ char* read_file(char* file){
 
 void fetchFile(char *buffer, int sockfd)
 {
-    printf("Sending File to server\n");
     char *cmd = strtok(buffer, ":");
     char *plens = strtok(NULL, ":");
     char *file_name = strtok(NULL, ":");
-    printf("%s", file_name);
+    printf("Sending file to server: %s", file_name);
     int foundFile = fileExists(file_name);
     if (!foundFile)
     {
@@ -181,8 +176,8 @@ void fetchFile(char *buffer, int sockfd)
     strcat(send, messageLen);
     strcat(send, ":");
     strcat(send, content);
-    printf("%s\n", content);
-    printf("%s\n", send);
+    // printf("%s\n", content);
+    // printf("%s\n", send);
     block_write(sockfd, send, totalLen);
 }
 

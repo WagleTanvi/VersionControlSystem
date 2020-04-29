@@ -1,242 +1,242 @@
 #include "helper.h"
 #include "record.h"
 
-//================== HELPER METHODS========================================
-/*Count digits in a number*/
-int digits(int n) {
-    int count = 0;
-    while (n != 0) {
-        n /= 10;     // n = n/10
-        ++count;
-    }
-    return count;
-}
+// //================== HELPER METHODS========================================
+// /*Count digits in a number*/
+// int digits(int n) {
+//     int count = 0;
+//     while (n != 0) {
+//         n /= 10;     // n = n/10
+//         ++count;
+//     }
+//     return count;
+// }
 
-/*Returns a string converted number*/
-char* to_Str(int number){
-    char* num_str = (char*)malloc(digits(number)+1*sizeof(char));
-    snprintf(num_str, digits(number)+1, "%d", number);
-    num_str[digits(number)+1] = '\0';
-    return num_str;
-}
+// /*Returns a string converted number*/
+// char* to_Str(int number){
+//     char* num_str = (char*)malloc(digits(number)+1*sizeof(char));
+//     snprintf(num_str, digits(number)+1, "%d", number);
+//     num_str[digits(number)+1] = '\0';
+//     return num_str;
+// }
 
-/* Check if malloc data is null */
-void check_malloc_null(void* data){
-    if ((char*) data == NULL ){
-        // malloc is null
-        printf("Could not allocate memory\n");
-        exit(1);
-    }
-}
+// /* Check if malloc data is null */
+// void check_malloc_null(void* data){
+//     if ((char*) data == NULL ){
+//         // malloc is null
+//         printf("Could not allocate memory\n");
+//         exit(1);
+//     }
+// }
 
-/*Get substring of a string*/
-char* getSubstring(int bcount, char* buffer, int nlen){
-    char* substr = (char*)malloc(nlen* sizeof(char));
-    check_malloc_null(substr);    
-    int count = 0;
-    while(count < nlen){
-        substr[count]=buffer[bcount];
-        count++;
-        bcount++;
-    }
-    substr[nlen] = '\0';
-    return substr;
-}
+// /*Get substring of a string*/
+// char* getSubstring(int bcount, char* buffer, int nlen){
+//     char* substr = (char*)malloc(nlen* sizeof(char));
+//     check_malloc_null(substr);    
+//     int count = 0;
+//     while(count < nlen){
+//         substr[count]=buffer[bcount];
+//         count++;
+//         bcount++;
+//     }
+//     substr[nlen] = '\0';
+//     return substr;
+// }
 
-/*Returns the command - create/checkout/etc...*/
-char* getCommand(char* buffer){
-    int strcount = 0;
-    while(buffer[strcount]!=':'){
-        strcount++;
-    }
-    char* command = (char*)malloc(strcount*sizeof(char));
-    command[0] = '\0';
-    int i = 0;
-    while(i < strcount){
-        command[i] = buffer[i];
-        i++;
-    }
-    command[strcount] = '\0';
-    return command;
-}
+// /*Returns the command - create/checkout/etc...*/
+// char* getCommand(char* buffer){
+//     int strcount = 0;
+//     while(buffer[strcount]!=':'){
+//         strcount++;
+//     }
+//     char* command = (char*)malloc(strcount*sizeof(char));
+//     command[0] = '\0';
+//     int i = 0;
+//     while(i < strcount){
+//         command[i] = buffer[i];
+//         i++;
+//     }
+//     command[strcount] = '\0';
+//     return command;
+// }
 
-/*Makes directory and all subdirectories*/
-void mkdir_recursive(const char *path){
-    char *subpath, *fullpath;
-    fullpath = strdup(path);
-    subpath = dirname(fullpath);
-    if (strlen(subpath) > 1)
-        mkdir_recursive(subpath);
-    int n = mkdir(path, 0775);
-    if(n < 0){
-        if(errno != 17){
-            printf("ERROR unable to make directory: %s\n", strerror(errno));
-        }
-    }
-    free(fullpath);
-}
+// /*Makes directory and all subdirectories*/
+// void mkdir_recursive(const char *path){
+//     char *subpath, *fullpath;
+//     fullpath = strdup(path);
+//     subpath = dirname(fullpath);
+//     if (strlen(subpath) > 1)
+//         mkdir_recursive(subpath);
+//     int n = mkdir(path, 0775);
+//     if(n < 0){
+//         if(errno != 17){
+//             printf("ERROR unable to make directory: %s\n", strerror(errno));
+//         }
+//     }
+//     free(fullpath);
+// }
 
-/*Returns swtiches the name from server to client*/
-char* change_to_client(char* str){
-    char* project_name = getSubstring(7, str, strlen(str));
-    char* pclient = (char*)malloc(8+strlen(project_name)*sizeof(char));
-    char client[8] = "client/\0";
-    int k = 0;
-    while(k < 8){
-        pclient[k] = client[k];
-        k++;
-    }
-    strcat(pclient, project_name);
-    return pclient;
-}
+// /*Returns swtiches the name from server to client*/
+// char* change_to_client(char* str){
+//     char* project_name = getSubstring(7, str, strlen(str));
+//     char* pclient = (char*)malloc(8+strlen(project_name)*sizeof(char));
+//     char client[8] = "client/\0";
+//     int k = 0;
+//     while(k < 8){
+//         pclient[k] = client[k];
+//         k++;
+//     }
+//     strcat(pclient, project_name);
+//     return pclient;
+// }
 
-/*Return string of file content*/
-char* getFileContent(char* file, char* flag){
-    int fd = open(file, O_RDONLY);
-    if(fd == -1){
-        printf("ERROR opening file: %s\n", strerror(errno));
-        return NULL;
-    }
-    struct stat stats;
-    if(stat(file, &stats) == 0){
-        int fileSize = stats.st_size; 
-        char* buffer = (char*)malloc(fileSize+1 * sizeof(char));
-        check_malloc_null(buffer);
-        int status = 0;    
-        int readIn = 0;
-        do{
-            status = read(fd, buffer+readIn, fileSize);
-            readIn += status;
-        } while (status > 0 && readIn < fileSize);
-        buffer[fileSize] = '\0';
-        close(fd);
+// /*Return string of file content*/
+// char* getFileContent(char* file, char* flag){
+//     int fd = open(file, O_RDONLY);
+//     if(fd == -1){
+//         printf("ERROR opening file: %s\n", strerror(errno));
+//         return NULL;
+//     }
+//     struct stat stats;
+//     if(stat(file, &stats) == 0){
+//         int fileSize = stats.st_size; 
+//         char* buffer = (char*)malloc(fileSize+1 * sizeof(char));
+//         check_malloc_null(buffer);
+//         int status = 0;    
+//         int readIn = 0;
+//         do{
+//             status = read(fd, buffer+readIn, fileSize);
+//             readIn += status;
+//         } while (status > 0 && readIn < fileSize);
+//         buffer[fileSize] = '\0';
+//         close(fd);
 
-        /*Append the necessary flag!*/
-        if(strcmp(flag, "")==0) 
-            return buffer;
-        else{
-            char f[2] = "C\0";
-            char* new_buffer = (char*)malloc(strlen(buffer)+2*sizeof(char));
-            check_malloc_null(new_buffer);
-            int i = 0;
-            while(i < 2){
-                new_buffer[i] = f[i];
-                i++;
-            }
-            strcat(new_buffer, buffer);
-            return new_buffer;
-        }
-    }
-    close(fd);
-    printf("Warning: stat error. \n");
-    return NULL; 
-}
+//         /*Append the necessary flag!*/
+//         if(strcmp(flag, "")==0) 
+//             return buffer;
+//         else{
+//             char f[2] = "C\0";
+//             char* new_buffer = (char*)malloc(strlen(buffer)+2*sizeof(char));
+//             check_malloc_null(new_buffer);
+//             int i = 0;
+//             while(i < 2){
+//                 new_buffer[i] = f[i];
+//                 i++;
+//             }
+//             strcat(new_buffer, buffer);
+//             return new_buffer;
+//         }
+//     }
+//     close(fd);
+//     printf("Warning: stat error. \n");
+//     return NULL; 
+// }
 
-/*Returns if server has the given project - needs the full path.*/
-Boolean search_proj_exists(char* project_name){    
-    char path[4096];
-    struct dirent *d;
-    DIR *dir = opendir("./");
-    if (dir == NULL){
-        return false;
-    }    
-    while ((d = readdir(dir)) != NULL) {
-        if(strcmp(d->d_name, project_name)==0){
-            closedir(dir);
-            return true;
-        }
-    }
-    closedir(dir);
-    return false;
-}
+// /*Returns if server has the given project - needs the full path.*/
+// Boolean search_proj_exists(char* project_name){    
+//     char path[4096];
+//     struct dirent *d;
+//     DIR *dir = opendir("./");
+//     if (dir == NULL){
+//         return false;
+//     }    
+//     while ((d = readdir(dir)) != NULL) {
+//         if(strcmp(d->d_name, project_name)==0){
+//             closedir(dir);
+//             return true;
+//         }
+//     }
+//     closedir(dir);
+//     return false;
+// }
 
-/* Returns number of lines in file */
-int number_of_lines(char* fileData){
-    int count = 0;
-    int pos = 0;
-    while (pos < strlen(fileData)){
-        if (fileData[pos] == '\n'){
-            count++;
-        }
-        pos++;
-    }
-    return count;
-}
+// /* Returns number of lines in file */
+// int number_of_lines(char* fileData){
+//     int count = 0;
+//     int pos = 0;
+//     while (pos < strlen(fileData)){
+//         if (fileData[pos] == '\n'){
+//             count++;
+//         }
+//         pos++;
+//     }
+//     return count;
+// }
 
-// Returns hostname for the local computer 
-void checkHostName(int hostname) 
-{ 
-    if (hostname == -1) 
-    { 
-        perror("gethostname"); 
-    } 
-}
+// // Returns hostname for the local computer 
+// void checkHostName(int hostname) 
+// { 
+//     if (hostname == -1) 
+//     { 
+//         perror("gethostname"); 
+//     } 
+// }
 
-// Returns host information corresponding to host name 
-void checkHostEntry(struct hostent * hostentry) 
-{ 
-    if (hostentry == NULL) 
-    { 
-        perror("gethostbyname"); 
-    } 
-} 
+// // Returns host information corresponding to host name 
+// void checkHostEntry(struct hostent * hostentry) 
+// { 
+//     if (hostentry == NULL) 
+//     { 
+//         perror("gethostbyname"); 
+//     } 
+// } 
   
-// Converts space-delimited IPv4 addresses 
-// to dotted-decimal format 
-void checkIPbuffer(char *IPbuffer) 
-{ 
-    if (NULL == IPbuffer) 
-    { 
-        perror("inet_ntoa"); 
-    } 
-} 
+// // Converts space-delimited IPv4 addresses 
+// // to dotted-decimal format 
+// void checkIPbuffer(char *IPbuffer) 
+// { 
+//     if (NULL == IPbuffer) 
+//     { 
+//         perror("inet_ntoa"); 
+//     } 
+// } 
   
-// Driver code 
-char* get_host_name()
-{ 
-    char hostbuffer[256]; 
-    char *IPbuffer; 
-    struct hostent *host_entry; 
-    int hostname; 
+// // Driver code 
+// char* get_host_name()
+// { 
+//     char hostbuffer[256]; 
+//     char *IPbuffer; 
+//     struct hostent *host_entry; 
+//     int hostname; 
   
-    // To retrieve hostname 
-    hostname = gethostname(hostbuffer, sizeof(hostbuffer)); 
-    checkHostName(hostname); 
+//     // To retrieve hostname 
+//     hostname = gethostname(hostbuffer, sizeof(hostbuffer)); 
+//     checkHostName(hostname); 
 
-    // To retrieve host information 
-    host_entry = gethostbyname(hostbuffer); 
-    checkHostEntry(host_entry); 
+//     // To retrieve host information 
+//     host_entry = gethostbyname(hostbuffer); 
+//     checkHostEntry(host_entry); 
   
-    // To convert an Internet network 
-    // address into ASCII string 
-    IPbuffer = inet_ntoa(*((struct in_addr*) 
-                           host_entry->h_addr_list[0])); 
+//     // To convert an Internet network 
+//     // address into ASCII string 
+//     IPbuffer = inet_ntoa(*((struct in_addr*) 
+//                            host_entry->h_addr_list[0])); 
   
-    return IPbuffer; 
-} 
+//     return IPbuffer; 
+// } 
 
-char *fetch_file_from_client(char *fileName, int clientSoc)
-{
-    char* cmd = (char*)malloc(strlen("sendfile")+1+digits(strlen(fileName))+1+strlen(fileName)*sizeof(char));
-    cmd[0] = '\0';
-    strcat(cmd, "sendfile");
-    strcat(cmd, ":");
-    strcat(cmd, to_Str(strlen(fileName)));
-    strcat(cmd, ":");
-    strcat(cmd, fileName);
-    char* ext_cmd = (char*)malloc(digits(strlen(cmd))+1*sizeof(char));
-    ext_cmd[0] = '\0';
-    strcat(ext_cmd, to_Str(strlen(cmd)));
-    strcat(ext_cmd, ":");
-    strcat(ext_cmd, cmd);
+// char *fetch_file_from_client(char *fileName, int clientSoc)
+// {
+//     char* cmd = (char*)malloc(strlen("sendfile")+1+digits(strlen(fileName))+1+strlen(fileName)*sizeof(char));
+//     cmd[0] = '\0';
+//     strcat(cmd, "sendfile");
+//     strcat(cmd, ":");
+//     strcat(cmd, to_Str(strlen(fileName)));
+//     strcat(cmd, ":");
+//     strcat(cmd, fileName);
+//     char* ext_cmd = (char*)malloc(digits(strlen(cmd))+1*sizeof(char));
+//     ext_cmd[0] = '\0';
+//     strcat(ext_cmd, to_Str(strlen(cmd)));
+//     strcat(ext_cmd, ":");
+//     strcat(ext_cmd, cmd);
     
-    block_write(clientSoc, ext_cmd, strlen(ext_cmd));
-    int messageLen = read_len_message(clientSoc);
-    char* clientData = block_read(clientSoc, messageLen);
-    if (strstr(clientData, "ERROR") != NULL) // check if errored (project name does not exist on server)
-    {
-        printf("%s", clientData);
-        return NULL;
-    }
-    return clientData;
-}
+//     block_write(clientSoc, ext_cmd, strlen(ext_cmd));
+//     int messageLen = read_len_message(clientSoc);
+//     char* clientData = block_read(clientSoc, messageLen);
+//     if (strstr(clientData, "ERROR") != NULL) // check if errored (project name does not exist on server)
+//     {
+//         printf("%s", clientData);
+//         return NULL;
+//     }
+//     return clientData;
+// }
