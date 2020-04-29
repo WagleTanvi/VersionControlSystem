@@ -9,6 +9,9 @@ typedef struct MutexArray{
 
 int cmd_count = 0;
 
+MutexArray* array_of_mutexes;
+int array_of_mutexes_size = 0;
+
 //================== HELPER METHODS========================================
 /*Count digits in a number*/
 int digits(int n) {
@@ -169,7 +172,7 @@ void checkIPbuffer(char *IPbuffer)
     } 
 } 
   
-// Driver code 
+/*Returns the IP address of a machine!*/ 
 char* get_host_name()
 { 
     char hostbuffer[256]; 
@@ -185,10 +188,8 @@ char* get_host_name()
     host_entry = gethostbyname(hostbuffer); 
     checkHostEntry(host_entry); 
   
-    // To convert an Internet network 
-    // address into ASCII string 
-    IPbuffer = inet_ntoa(*((struct in_addr*) 
-                           host_entry->h_addr_list[0])); 
+    // To convert an Internet network address into ASCII string 
+    IPbuffer = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0])); 
   
     return IPbuffer; 
 } 
@@ -217,6 +218,55 @@ char *fetch_file_from_client(char *fileName, int clientSoc)
         return NULL;
     }
     return clientData;
+}
+
+/*Returns all the projects in the CWD*/
+int find_all_projects(){
+    char path[4096];
+    int count = 0;
+    struct dirent *d;
+    DIR *dir = opendir("./");
+    if (dir == NULL){
+        return 0;
+    }    
+    while ((d = readdir(dir)) != NULL) {
+        if (d->d_type == DT_DIR){
+            count++;
+        }
+    }
+    closedir(dir);
+    return count;
+}
+
+/*Returns the names of all the  projects in the CWD as a string array*/
+char** get_project_names(int size){
+    char path[4096];
+    char** project_names = (char**)malloc(size*sizeof(char*));
+    struct dirent *d;
+    DIR *dir = opendir("./");
+    if (dir == NULL){
+        return NULL;
+    }    
+    int i = 0;
+    while ((d = readdir(dir)) != NULL) {
+        if (d->d_type == DT_DIR){
+            project_names[i] = d->d_name;
+            i++;
+        }
+    }
+    closedir(dir);
+    return project_names;
+}
+
+/*Returns the corresponding mutex to the project name*/
+pthread_mutex_t find_mutex(char* pname){
+    int i = 0;
+    while(i < array_of_mutexes_size){
+        if(strcmp(array_of_mutexes[i].projectName,pname)==0){
+            return array_of_mutexes[i].mutex;
+        }
+        i++;
+    }
 }
 
 //=============================== HISTORY ======================
@@ -587,6 +637,9 @@ void push_commits(char *buffer, int clientSoc)
                 return;
             }
             //pthread_mutex_lock(&mutex);
+            
+            pthread_mutex_t m = find_mutex(project_name);
+            pthread_mutex_lock(&m);
             // write content to file
             mkdir_recursive(filepath);
             int fd = open(filepath, O_WRONLY | O_TRUNC);
@@ -595,7 +648,7 @@ void push_commits(char *buffer, int clientSoc)
                 printf("Fatal Error: Could not open Update file");
             }
             block_write(fd, newContent, strlen(newContent));
-            //pthread_mutex_unlock(&mutex);
+            pthread_mutex_unlock(&m);
         }
         else if (strcmp(active_commit[x]->version, "A") == 0)
         { //add file
@@ -644,7 +697,8 @@ void push_commits(char *buffer, int clientSoc)
         }
         else if (strcmp(active_commit[x]->version, "D") == 0)
         { //delete file
-            //pthread_mutex_lock(&mutex);
+            pthread_mutex_t m = find_mutex(project_name);
+            pthread_mutex_lock(&m);
             char *filepath = active_commit[x]->file;
             x = 1;
             int size = getRecordStructSize(server_manifest);
@@ -660,7 +714,7 @@ void push_commits(char *buffer, int clientSoc)
                 x++;
             }
             int r = remove(filepath);
-            //pthread_mutex_unlock(&mutex);
+            pthread_mutex_unlock(&m);
 
         }
         else
@@ -1001,10 +1055,10 @@ void destroyProject(char *buffer, int clientSoc)
     pserver[0] = '\0';
     strcat(pserver, project_name);
 
-    /*mutex lock here????*/
-    //pthread_mutex_lock(&mutex);
+    pthread_mutex_t m = find_mutex(project_name);
+    pthread_mutex_lock(&m);
     int r = remove_directory(pserver);
-    //pthread_mutex_unlock(&mutex);
+    pthread_mutex_unlock(&m);
 
     free(project_name);
     free(pserver);
@@ -1419,12 +1473,13 @@ void set_up_connection(char *port)
 
     /*Initialize the mutex array structure*/
     int num_of_projects = find_all_projects();
-    char* projectNames = get_project_names();
-    MutexArray* array_of_mutexes = (MutexArray*)(num_of_projects*sizeof(MutexArray));
+    array_of_mutexes_size = num_of_projects;
+    char** projectNames = get_project_names(num_of_projects);
+    array_of_mutexes = (MutexArray*)(num_of_projects*sizeof(MutexArray));
     int i = 0;
     while(i < num_of_projects){
-        array_of_mutexes[i]->projectName = projectNames[i];
-        pthread_mutex_init(&(array_of_mutexes[i]->mutex), NULL);
+        array_of_mutexes[i].projectName = projectNames[i];
+        pthread_mutex_init(&(array_of_mutexes[i].mutex), NULL);
         i++;
     }
         
@@ -1450,7 +1505,7 @@ void set_up_connection(char *port)
                 printf("ERROR unable to create thread.\n");
             }
             i++;
-            pthread_detach(thread);
+            pthread_detach(tid[i]);
         }
     }
 
@@ -1460,12 +1515,7 @@ void set_up_connection(char *port)
         pthread_join(tid[i], NULL);
     }
 
-    /*destroy the mutex array*/
-    i = 0;
-    while(i < 5){
-        pthread_mutex_destroy(&mutexes[i]); 
-        i++;
-    }
+    /*Free and destroy the mutex array structure*/
     
 }
 
