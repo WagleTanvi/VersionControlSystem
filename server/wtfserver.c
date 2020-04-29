@@ -9,8 +9,8 @@ typedef struct MutexArray{
 
 int cmd_count = 0;
 
-MutexArray* array_of_mutexes;
-int array_of_mutexes_size = 0;
+MutexArray* array_of_mutexes[5];
+int array_of_mutexes_size = 5;
 
 //================== HELPER METHODS========================================
 /*Count digits in a number*/
@@ -230,6 +230,7 @@ int find_all_projects(){
         return 0;
     }    
     while ((d = readdir(dir)) != NULL) {
+        if(strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, "header-files") == 0) continue;
         if (d->d_type == DT_DIR){
             count++;
         }
@@ -249,6 +250,7 @@ char** get_project_names(int size){
     }    
     int i = 0;
     while ((d = readdir(dir)) != NULL) {
+        if(strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, "header-files") == 0) continue;
         if (d->d_type == DT_DIR){
             project_names[i] = d->d_name;
             i++;
@@ -262,8 +264,8 @@ char** get_project_names(int size){
 pthread_mutex_t find_mutex(char* pname){
     int i = 0;
     while(i < array_of_mutexes_size){
-        if(strcmp(array_of_mutexes[i].projectName,pname)==0){
-            return array_of_mutexes[i].mutex;
+        if(strcmp(array_of_mutexes[i]->projectName,pname)==0){
+            return array_of_mutexes[i]->mutex;
         }
         i++;
     }
@@ -330,12 +332,26 @@ char *get_current_version(char *buffer, int clientSoc, char flag)
     manifestpath[0] = '\0';
     strcat(manifestpath, project_name);
     strcat(manifestpath, "/.Manifest");
-    char *manifest_data = getFileContent(manifestpath, "");
-    Record **manifest = create_record_struct(manifest_data, 0, 'M');
+    int fd = open(manifestpath, O_RDONLY, 0775);
+    char version_buf[50];
+    bzero(version_buf, 50);
+    int status = 0;
+    int readIn = 0;
+    do
+    {
+        status = read(fd, version_buf + readIn, 1);
+        readIn += status;
+    } while (version_buf[readIn - 1] != '\n' && status > 0);
+    char* num = (char*)malloc(20*sizeof(char));
+    int i = 0;
+    while(i < strlen(version_buf)){
+        num[i] = version_buf[i];
+        i++;
+    }
+    num[strlen(version_buf)] = '\0';
 
     free(manifestpath);
-
-    return manifest[0]->version;
+    return num;
 }
 
 //=============================== ROLLBACK ======================
@@ -639,6 +655,7 @@ void push_commits(char *buffer, int clientSoc)
             //pthread_mutex_lock(&mutex);
             
             pthread_mutex_t m = find_mutex(project_name);
+            pthread_mutex_unlock(&m);
             pthread_mutex_lock(&m);
             // write content to file
             mkdir_recursive(filepath);
@@ -698,6 +715,7 @@ void push_commits(char *buffer, int clientSoc)
         else if (strcmp(active_commit[x]->version, "D") == 0)
         { //delete file
             pthread_mutex_t m = find_mutex(project_name);
+            pthread_mutex_unlock(&m);
             pthread_mutex_lock(&m);
             char *filepath = active_commit[x]->file;
             x = 1;
@@ -759,10 +777,10 @@ void push_commits(char *buffer, int clientSoc)
     block_write(clientSoc, "32:Server has successfully pushed.\0", 35);
 
     /*free stuff*/
-    free(file_content);
-    free(file_content2);
-    free(pserver);
-    free(manifestpath);
+    // free(file_content);
+    // free(file_content2);
+    // free(pserver);
+    // free(manifestpath);
 //     free(pserver);
 //     free(manifestpath);
 //     free(history_dir);
@@ -838,11 +856,11 @@ void create_commit_file(char *buffer, int clientSoc)
     file_content[atoi(size)] = '\0';
     write(commitFile, file_content, atoi(size));
 
-    free(project_name);
-    free(pending_commits);
-    free(pserver);
-    free(size);
-    free(file_content);
+    // free(project_name);
+    // free(pending_commits);
+    // free(pserver);
+    // free(size);
+    // free(file_content);
 }
 
 //===============================GET MANIFEST======================
@@ -1044,7 +1062,7 @@ void destroyProject(char *buffer, int clientSoc)
     if (foundProj == 0)
     {
         free(project_name);
-        int n = write(clientSoc, "ERROR the project does not exist on server.\n", 40);
+        int n = write(clientSoc, "44:ERROR the project does not exist on server.\n", 47);
         if (n < 0)
             printf("ERROR writing to the client.\n");
         return;
@@ -1056,6 +1074,7 @@ void destroyProject(char *buffer, int clientSoc)
     strcat(pserver, project_name);
 
     pthread_mutex_t m = find_mutex(project_name);
+    pthread_mutex_unlock(&m);
     pthread_mutex_lock(&m);
     int r = remove_directory(pserver);
     pthread_mutex_unlock(&m);
@@ -1068,7 +1087,7 @@ void destroyProject(char *buffer, int clientSoc)
         printf("ERROR traversing directory.\n");
     else
     {
-        int n = write(clientSoc, "Successfully destroyed project.\n", 33);
+        int n = write(clientSoc, "32:Successfully destroyed project.\n", 35);
         if (n < 0)
             printf("ERROR writing to the client.\n");
         return;
@@ -1221,7 +1240,7 @@ void createProject(char *buffer, int clientSoc)
         if (foundProj == 1)
         {
             free(project_name);
-            block_write(clientSoc, "43:ERROR the project already exists on server.", 46);
+            block_write(clientSoc, "34:ERROR the project already exists.\n", 37);
             return;
         }
 
@@ -1336,7 +1355,16 @@ void parseRead(char *buffer, int clientSoc)
         else if (strcmp(command, "currentversion") == 0)
         {
             char *current_version = get_current_version(buffer, clientSoc, 'N');
-            int n = write(clientSoc, current_version, strlen(current_version));
+            char* format_str = (char*)malloc(digits(strlen(current_version))+1+strlen(current_version)*sizeof(char));
+            format_str[0] = '\0';
+            char* intToStr = to_Str(strlen(current_version));
+            strcat(format_str, intToStr);
+            strcat(format_str, ":");
+            strcat(format_str, current_version);
+            block_write(clientSoc, format_str, strlen(format_str));
+            
+            free(format_str);
+            free(intToStr);
         }
         else if (strcmp(command, "sendfile") == 0)
         {
@@ -1475,11 +1503,13 @@ void set_up_connection(char *port)
     int num_of_projects = find_all_projects();
     array_of_mutexes_size = num_of_projects;
     char** projectNames = get_project_names(num_of_projects);
-    array_of_mutexes = (MutexArray*)(num_of_projects*sizeof(MutexArray));
+    //array_of_mutexes = (MutexArray*)(num_of_projects*sizeof(MutexArray));
     int i = 0;
     while(i < num_of_projects){
-        array_of_mutexes[i].projectName = projectNames[i];
-        pthread_mutex_init(&(array_of_mutexes[i].mutex), NULL);
+        MutexArray* new_mutex_element = (MutexArray*)malloc(sizeof(MutexArray));
+        new_mutex_element->projectName = projectNames[i];
+        pthread_mutex_init(&(new_mutex_element->mutex), NULL);
+        array_of_mutexes[i] = new_mutex_element;
         i++;
     }
         
@@ -1505,7 +1535,7 @@ void set_up_connection(char *port)
                 printf("ERROR unable to create thread.\n");
             }
             i++;
-            pthread_detach(tid[i]);
+            //pthread_detach(tid[i]);
         }
     }
 

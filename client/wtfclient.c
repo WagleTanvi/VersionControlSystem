@@ -754,6 +754,10 @@ void parseBuffer_create(char *buffer)
             if (tok[0] == 'P')
             {
                 char *projectName = substr(tok, 1, strlen(tok));
+                if(searchForProject(projectName) == true){
+                    printf("ERROR project already exists!\n");
+                    return;
+                }
                 mkdir_recursive(projectName);
                 int ch = chmod(projectName, 0775);
                 if (ch < 0)
@@ -1112,16 +1116,12 @@ int main(int argc, char **argv)
             char* buffer = read_from_server(sockfd);
             if(strstr(buffer, "sendfile")!=NULL){
                 fetchFile(buffer, sockfd);
-                char* buffer = read_from_server(sockfd);
-                fetchFile(buffer, sockfd);
-                continue;
-            } 
-            else if(strcmp(buffer, "Server has successfully pushed.\0")==0){
-                remove_commit_file(sockfd, argv[2]);
-                increment_manifest_version(argv[2], sockfd);
+            } else {
                 break;
             }
-        }
+        } 
+        remove_commit_file(sockfd, argv[2]);
+        increment_manifest_version(argv[2], sockfd);
     }
     else if(argc == 4 && (strcmp(argv[1], "rollback")==0))
     {
