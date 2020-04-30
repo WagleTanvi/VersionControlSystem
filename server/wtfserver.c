@@ -306,9 +306,8 @@ void duplicate_dir(char *project_path, char *new_project_path)
             {
                 printf("ERROR unable to make new file: %s\n", strerror(errno));
             }
-            char* old_file_contents = getFileContent(path, "");
+            char *old_file_contents = getFileContent(path, "");
             write(dup_file, old_file_contents, strlen(old_file_contents));
-            
         }
     }
     closedir(dir);
@@ -351,10 +350,10 @@ void push_commits(char *buffer, int clientSoc)
     free(size);
 
     /*Get server commit file and compare with the client commit file*/
-    char* hostname = get_host_name();
-    char* pserver = (char*)malloc(strlen(project_name)+strlen(hostname)+strlen("/pending-commits/.Commit-"));
-    pserver[0]='\0';
-    strcat(pserver, project_name); 
+    char *hostname = get_host_name();
+    char *pserver = (char *)malloc(strlen(project_name) + strlen(hostname) + strlen("/pending-commits/.Commit-"));
+    pserver[0] = '\0';
+    strcat(pserver, project_name);
     strcat(pserver, "/pending-commits/.Commit-");
     strcat(pserver, hostname);
     char* server_file_content = getFileContent(pserver, "");
@@ -439,7 +438,7 @@ void push_commits(char *buffer, int clientSoc)
             {
                 printf("ERROR could not find the file in the manifest. Update?\n");
             }
-            char* newContent = fetch_file_from_client(filepath, clientSoc);
+            char *newContent = fetch_file_from_client(filepath, clientSoc);
             if (newContent == NULL)
             {
                 return;
@@ -486,9 +485,10 @@ void push_commits(char *buffer, int clientSoc)
                 {
                     m++;
                 }
-                if(server_manifest[m]==NULL && m != server_manifest_size){
+                if (server_manifest[m] == NULL && m != server_manifest_size)
+                {
                     server_manifest[m] = new_manifest_rec;
-                } 
+                }
             }
             char *newContent = fetch_file_from_client(filepath, clientSoc);
             if (newContent == NULL)
@@ -604,19 +604,20 @@ void create_commit_file(char *buffer, int clientSoc)
     }
 
     /*make the pending commits folder - stores each commit for each client*/
-    char* pending_commits = (char*)malloc(strlen(project_name)+strlen("/pending-commits\0")*sizeof(char));
-    pending_commits[0]='\0';
+    char *pending_commits = (char *)malloc(strlen(project_name) + strlen("/pending-commits\0") * sizeof(char));
+    pending_commits[0] = '\0';
     strcat(pending_commits, project_name);
-    strcat(pending_commits, "/pending-commits\0"); 
+    strcat(pending_commits, "/pending-commits\0");
     mkdir_recursive(pending_commits);
     int ch = chmod(pending_commits, 0775);
-    if(ch<0) printf("ERROR set permission error.\n");
+    if (ch < 0)
+        printf("ERROR set permission error.\n");
 
     /*make commit file*/
-    char* hostname = get_host_name();
-    char* pserver = (char*)malloc(strlen(project_name)+strlen(hostname)+strlen("/pending-commits/.Commit-"));
-    pserver[0]='\0';
-    strcat(pserver, project_name); 
+    char *hostname = get_host_name();
+    char *pserver = (char *)malloc(strlen(project_name) + strlen(hostname) + strlen("/pending-commits/.Commit-"));
+    pserver[0] = '\0';
+    strcat(pserver, project_name);
     strcat(pserver, "/pending-commits/.Commit-");
     strcat(pserver, hostname);
     int commitFile = open(pserver, O_WRONLY | O_CREAT | O_TRUNC, 0775);
@@ -1146,11 +1147,11 @@ void parseRead(char *buffer, int clientSoc)
         {
             create_commit_file(buffer, clientSoc);
         }
-        else if(strcmp(command, "push")==0)
+        else if (strcmp(command, "push") == 0)
         {
             push_commits(buffer, clientSoc);
         }
-        else if(strcmp(command, "rollback")==0)
+        else if (strcmp(command, "rollback") == 0)
         {
             rollback(buffer, clientSoc);
         }
@@ -1295,8 +1296,10 @@ void set_up_connection(char *port)
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     serv_addr.sin_port = htons(portno);
     if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-        printf("ERROR on binding");
-
+    {
+        printf("Fatal Error: on binding");
+        exit(0);
+    }
     /*listen on port*/
     listen(sockfd, 10);
     printf("Server Listening\n");
