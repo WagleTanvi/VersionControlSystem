@@ -54,6 +54,9 @@ char* getFileContent(char* file, char* flag);
 
 /*Returns if server has the given project - needs the full path.*/
 Boolean search_proj_exists(char* project_name);
+
+/* Returns number of lines in file */
+int number_of_lines(char *fileData);
   
 // Returns hostname for the local computer 
 void checkHostName(int hostname);
@@ -110,7 +113,7 @@ void destroyProject(char *buffer, int clientSoc);
 
 //=============================== CHECKOUT ======================
 /*Increments the global counter- cmd_count*/
-void inc_command_length(char* dirPath);
+void inc_command_length(char* dirPath, pthread_mutex_t m);
 
 /*Returns an char** array that stores all the things to be concatenated together.*/
 char *checkoutProject(char *command, char *dirPath, int clientSoc);

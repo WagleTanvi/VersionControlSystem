@@ -449,14 +449,14 @@ void push_commits(char *buffer, int clientSoc)
             pthread_mutex_t m = find_mutex(project_name);
             pthread_mutex_unlock(&m);
             pthread_mutex_lock(&m);
-            // write content to file
-            mkdir_recursive(filepath);
-            int fd = open(filepath, O_WRONLY | O_TRUNC);
-            if (fd == -1)
-            {
-                printf("Fatal Error: Could not open Update file");
-            }
-            block_write(fd, newContent, strlen(newContent));
+                // write content to file
+                mkdir_recursive(filepath);
+                int fd = open(filepath, O_WRONLY | O_TRUNC);
+                if (fd == -1)
+                {
+                    printf("Fatal Error: Could not open Update file");
+                }
+                block_write(fd, newContent, strlen(newContent));
             pthread_mutex_unlock(&m);
         }
         else if (strcmp(active_commit[x]->version, "A") == 0)
@@ -509,21 +509,21 @@ void push_commits(char *buffer, int clientSoc)
             pthread_mutex_t m = find_mutex(project_name);
             pthread_mutex_unlock(&m);
             pthread_mutex_lock(&m);
-            char *filepath = active_commit[x]->file;
-            x = 1;
-            int size = getRecordStructSize(server_manifest);
-            while (x < size){
-                if (server_manifest[x] != NULL && server_manifest[x]->file != NULL && strcmp(server_manifest[x]->file, filepath) == 0){
-                    free(server_manifest[x]->version);
-                    free(server_manifest[x]->file);
-                    free(server_manifest[x]->hash);
-                    free(server_manifest[x]);
-                    server_manifest[x] = NULL;
+                char *filepath = active_commit[x]->file;
+                x = 1;
+                int size = getRecordStructSize(server_manifest);
+                while (x < size){
+                    if (server_manifest[x] != NULL && server_manifest[x]->file != NULL && strcmp(server_manifest[x]->file, filepath) == 0){
+                        free(server_manifest[x]->version);
+                        free(server_manifest[x]->file);
+                        free(server_manifest[x]->hash);
+                        free(server_manifest[x]);
+                        server_manifest[x] = NULL;
 
+                    }
+                    x++;
                 }
-                x++;
-            }
-            int r = remove(filepath);
+                int r = remove(filepath);
             pthread_mutex_unlock(&m);
 
         }
@@ -868,7 +868,7 @@ void destroyProject(char *buffer, int clientSoc)
     pthread_mutex_t m = find_mutex(project_name);
     pthread_mutex_unlock(&m);
     pthread_mutex_lock(&m);
-    int r = remove_directory(pserver);
+        int r = remove_directory(pserver);
     pthread_mutex_unlock(&m);
 
     free(project_name);
@@ -888,7 +888,7 @@ void destroyProject(char *buffer, int clientSoc)
 
 //=============================== CHECKOUT ======================
 /*Increments the global counter- cmd_count*/
-void inc_command_length(char *dirPath)
+void inc_command_length(char *dirPath, pthread_mutex_t m)
 {
     /*traverse the directory*/
     char path[4096];
@@ -901,9 +901,11 @@ void inc_command_length(char *dirPath)
     }
     else
     {
-        cmd_count += (digits(strlen(dirPath)));
-        cmd_count += (strlen(dirPath));
-        cmd_count += 4;
+        pthread_mutex_lock(&m);
+            cmd_count += (digits(strlen(dirPath)));
+            cmd_count += (strlen(dirPath));
+            cmd_count += 4;
+        pthread_mutex_unlock(&m);
     }
     while ((d = readdir(dir)) != NULL)
     {
@@ -912,21 +914,23 @@ void inc_command_length(char *dirPath)
             continue;
         if (d->d_type != DT_DIR)
         {
-            /*for a file*/
-            cmd_count += (digits(strlen(path)));
-            cmd_count += (strlen(path));
-            cmd_count += 6;
+            pthread_mutex_lock(&m);
+                /*for a file*/
+                cmd_count += (digits(strlen(path)));
+                cmd_count += (strlen(path));
+                cmd_count += 6;
 
-            /*for the file content*/
-            char *data_client = getFileContent(path, "C");
-            cmd_count += (digits(strlen(data_client)));
-            cmd_count += (strlen(data_client));
-            cmd_count += 2;
+                /*for the file content*/
+                char *data_client = getFileContent(path, "C");
+                cmd_count += (digits(strlen(data_client)));
+                cmd_count += (strlen(data_client));
+                cmd_count += 2;
+            pthread_mutex_unlock(&m);
             free(data_client);
         }
         else
         {
-            inc_command_length(path);
+            inc_command_length(path, m);
         }
     }
     closedir(dir);
@@ -1070,8 +1074,14 @@ void createProject(char *buffer, int clientSoc)
     }
 
     /*send string to client to make project*/
-    cmd_count += (strlen(cmd) + 1);
-    inc_command_length(project_name);
+    pthread_mutex_t m = find_mutex(project_name);
+    pthread_mutex_unlock(&m);
+    pthread_mutex_lock(&m);
+        cmd_count = 0;
+        cmd_count += (strlen(cmd) + 1);
+    pthread_mutex_unlock(&m);
+
+    inc_command_length(project_name, m);
     char *command = (char *)malloc(cmd_count * sizeof(char));
     command[0] = '\0';
     strcat(command, cmd);
@@ -1326,8 +1336,9 @@ void set_up_connection(char *port)
             if(error < 0){
                 printf("ERROR unable to create thread.\n");
             }
-            i++;
             //pthread_detach(tid[i]);
+            i++;
+            
         }
     }
 
@@ -1338,6 +1349,13 @@ void set_up_connection(char *port)
     }
 
     /*Free and destroy the mutex array structure*/
+    i = 0;
+    while(i < num_of_projects){
+        free(array_of_mutexes[i]->projectName);
+        pthread_mutex_destroy(&(array_of_mutexes[i]->mutex));
+        free(array_of_mutexes[i]);
+        i++;
+    }
     
 }
 
