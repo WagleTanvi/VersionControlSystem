@@ -195,7 +195,7 @@ void rollback(char *buffer, int clientSoc)
     history_dir[0] = '\0';
     strcat(history_dir, project_name);
     strcat(history_dir, "/history\0");
-    char *new_project_name;
+    char *new_project_name = (char*)malloc(strlen(project_name)+5*sizeof(char));
     Boolean found = false;
     char path[4096];
     struct dirent *d;
@@ -221,12 +221,12 @@ void rollback(char *buffer, int clientSoc)
             if (version_num == req_version)
             {
                 found = true;
-                new_project_name = d->d_name; //new_project_name = ivyproject-1
+                strcpy(new_project_name, d->d_name); //new_project_name = ivyproject-1
                 // break;
             }
             else if (version_num > req_version)
             {
-                rmdir(path);
+                int r = rmdir(path);
             }
             free(req_dir);
             free(format_str);
@@ -245,21 +245,20 @@ void rollback(char *buffer, int clientSoc)
     strcat(project_path, project_name);
     strcat(project_path, "/history/\0");
     strcat(project_path, new_project_name);
-
     duplicate_dir(project_path, new_project_name);
 
-    char* proj_to_destroy = (char*)malloc(strlen("destroy")+1+digits(strlen(project_name))+1+strlen(project_name));
-    proj_to_destroy[0] = '\0';
-    strcat(proj_to_destroy, "destroy:");
-    strcat(proj_to_destroy, to_Str(strlen(project_name)));
-    strcat(proj_to_destroy, ":");
-    strcat(proj_to_destroy, project_name);
-    destroyProject(proj_to_destroy, clientSoc);
-
     /*Renaming doesn't work for some reason >__<*/
-    int r = rename(new_project_name, project_name);
+    char* old_name = (char*)malloc(strlen(project_name)+strlen("-old"));
+    old_name[0] = '\0';
+    strcat(old_name, project_name);
+    strcat(old_name, "-old");
+    int r = rename(project_name, old_name);
     if(r != 0){
-        printf("ERROR renaming directory.\n");
+        printf("ERROR renaming directory: %s\n", strerror(errno));
+    }
+    r = rename(new_project_name, project_name);
+    if(r != 0){
+        printf("ERROR renaming directory: %s\n", strerror(errno));
     }
 
     /*Send a success to the client.*/
@@ -268,7 +267,7 @@ void rollback(char *buffer, int clientSoc)
     /*free stuff*/
     free(history_dir);
     free(project_path);
-    free(proj_to_destroy);
+    // free(proj_to_destroy);
     
 }
 
@@ -277,7 +276,7 @@ void rollback(char *buffer, int clientSoc)
 /*Given a project name, duplicate the directory*/
 // project path ivyproject
 // new project path history/ivyyproject-1
-void duplicate_dir(char *project_path, char *new_project_path)
+void duplicate_dir(char *project_path, const char *new_project_path)
 {
     char path[4096];
     char newpath[4096];
@@ -354,15 +353,18 @@ void push_commits(char *buffer, int clientSoc)
     int pleni = atoi(plens);
     char *project_name = getSubstring(bcount, buffer, pleni);
 
+    /*mutex stuff*/
+    pthread_mutex_t m = find_mutex(project_name);
+    pthread_mutex_unlock(&m);
+    pthread_mutex_lock(&m);
+
     /*check if the project exists in the server*/
     int foundProj = search_proj_exists(project_name);
     if (foundProj == 0)
     {
         expire_pending_commits(project_name, "");
         free(project_name);
-        int n = write(clientSoc, "ERROR project not in the server.\n", 36);
-        if (n < 0)
-            printf("ERROR writing to the client.\n");
+        block_write(clientSoc, "ERROR project not in the server.\n", 36);
         return;
     }
 
@@ -387,9 +389,24 @@ void push_commits(char *buffer, int clientSoc)
     strcat(pserver, "/pending-commits/.Commit-");
     strcat(pserver, hostname);
     char* server_file_content = getFileContent(pserver, "");
-    if(strcmp(file_content, server_file_content)!=0){
+    if(server_file_content == NULL){
         expire_pending_commits(project_name, "");
-        printf("ERROR the client and sever commit files do not match.\n");
+        free(project_name);
+        free(pserver);
+        block_write(clientSoc, "21:Push command failed!\n", 24);
+        return;
+    }
+    if(strcmp(file_content, server_file_content)!=0){
+        if(strcmp(server_file_content, "") == 0){
+            printf("ERROR the server commit file is empty.\n");
+        }
+        else{
+            printf("ERROR the client and sever commit files do not match.\n");
+        }
+        expire_pending_commits(project_name, "");
+        free(project_name);
+        free(pserver);
+        block_write(clientSoc, "21:Push command failed!\n", 24);
         return;
     }
     int num = number_of_lines(server_file_content);
@@ -477,6 +494,7 @@ void push_commits(char *buffer, int clientSoc)
             {
                 expire_pending_commits(project_name, "");
                 printf("ERROR could not find the file in the manifest. Update?\n");
+                block_write(clientSoc, "21:Push command failed!\n", 24);
                 return;
             }
             char *newContent = fetch_file_from_client(filepath, clientSoc);
@@ -486,20 +504,20 @@ void push_commits(char *buffer, int clientSoc)
             }
             //pthread_mutex_lock(&mutex);
             
-            pthread_mutex_t m = find_mutex(project_name);
-            pthread_mutex_unlock(&m);
-            pthread_mutex_lock(&m);
-                // write content to file
-                mkdir_recursive(filepath);
-                int fd = open(filepath, O_WRONLY | O_TRUNC);
-                if (fd == -1)
-                {
-                    expire_pending_commits(project_name, "");
-                    printf("Fatal Error: Could not open Update file");
-                    return;
-                }
+
+            // write content to file
+            mkdir_recursive(filepath);
+            int fd = open(filepath, O_WRONLY | O_TRUNC);
+            if (fd == -1)
+            {
+                expire_pending_commits(project_name, "");
+                printf("Fatal Error: Could not open Update file");
+                block_write(clientSoc, "21:Push command failed!\n", 24);
+                return;
+            }
+            if(strcmp(newContent, "empty")!=0){
                 block_write(fd, newContent, strlen(newContent));
-            pthread_mutex_unlock(&m);
+            }
         }
         else if (strcmp(active_commit[x]->version, "A") == 0)
         { //add file
@@ -510,6 +528,7 @@ void push_commits(char *buffer, int clientSoc)
             {
                 expire_pending_commits(project_name, "");
                 printf("ERROR unable to make new file: %s\n", strerror(errno));
+                block_write(clientSoc, "21:Push command failed!\n", 24);
                 return;
             }
             /*add the new file to the manifest*/
@@ -518,6 +537,7 @@ void push_commits(char *buffer, int clientSoc)
             {
                 expire_pending_commits(project_name, "");
                 printf("ERROR already exists in manifest.\n");
+                block_write(clientSoc, "21:Push command failed!\n", 24);
                 return;
             }
             else
@@ -548,9 +568,12 @@ void push_commits(char *buffer, int clientSoc)
             {
                 expire_pending_commits(project_name, "");
                 printf("Fatal Error: Could not open Update file");
+                block_write(clientSoc, "21:Push command failed!\n", 24);
                 return;
             }
-            block_write(fd, newContent, strlen(newContent));
+            if(strcmp(newContent, "empty")!=0){
+                block_write(fd, newContent, strlen(newContent));
+            }
         }
         else if (strcmp(active_commit[x]->version, "D") == 0)
         { //delete file
@@ -578,6 +601,7 @@ void push_commits(char *buffer, int clientSoc)
         else
         {
             printf("ERROR action not implemented.\n");
+            block_write(clientSoc, "21:Push command failed!\n", 24);
         }
         x++;
     }
@@ -614,18 +638,20 @@ void push_commits(char *buffer, int clientSoc)
     int unl = unlink(pserver);
 
     /*tell the client that push was successful*/
-    block_write(clientSoc, "32:Server has successfully pushed.\0", 35);
-
+    block_write(clientSoc, "32:Server has successfully pushed.\n", 35);
+    
     /*free stuff*/
     // free(file_content);
     // free(file_content2);
     // free(pserver);
     // free(manifestpath);
-//     free(pserver);
-//     free(manifestpath);
-//     free(history_dir);
-//     free(new_project_name);
-//     free(new_project_path);
+    // free(pserver);
+    // free(manifestpath);
+    // free(history_dir);
+    // free(new_project_name);
+    // free(new_project_path);
+
+    pthread_mutex_unlock(&m);
 }
 
 //=============================== COMMIT ======================
@@ -790,12 +816,9 @@ void fetchServerManifest(char *buffer, int clientSoc)
     int s = send_manifest(project_name, clientSoc);
 
     /*More error checking*/
-    if (s == -1)
-    {
+    if (s == -1){
         printf("ERROR sending Manifest to client./\n");
-    }
-    else if (s == -2)
-    {
+    } else if (s == -2){
         printf("ERROR cannot find Manifest file./\n");
     }
     free(project_name);
@@ -1402,13 +1425,13 @@ void set_up_connection(char *port)
     }
 
     /*Free and destroy the mutex array structure*/
-    i = 0;
-    while(i < num_of_projects){
-        free(array_of_mutexes[i]->projectName);
-        pthread_mutex_destroy(&(array_of_mutexes[i]->mutex));
-        free(array_of_mutexes[i]);
-        i++;
-    }
+    // i = 0;
+    // while(i < num_of_projects){
+    //     free(array_of_mutexes[i]->projectName);
+    //     pthread_mutex_destroy(&(array_of_mutexes[i]->mutex));
+    //     free(array_of_mutexes[i]);
+    //     i++;
+    // }
     
 }
 
