@@ -499,6 +499,7 @@ void update(char *projectName, int sockfd)
     //printf("FILE DATA: %s", fileData);
     Record **manifestClient = create_record_struct(fileData, true);
     //printAllRecords(manifestClient);
+    //printf("==========================");
     // free(manifestFilePath);
     free(fileData);
     /* send manifest command */
@@ -593,6 +594,7 @@ void update(char *projectName, int sockfd)
     // for each file in the server manifest return hash or NULL
     while (x < size)
     {
+        printf("yes");
         int clientIndex = search_record_hash(manifestClient, manifestServer[x]->file);
         int len = 4 + strlen(manifestServer[x]->file) + strlen(manifestServer[x]->hash);
         char *temp = (char *)malloc(sizeof(char *) * (len) + 1);
@@ -705,7 +707,7 @@ Boolean add_file_to_record(char *projectName, char *fileName, char *recordPath)
     }
     else
     {
-        write(fd, "1", 1);
+        write(fd, "0", 1);
         write(fd, " ", 1);
         write(fd, fileName, strlen(fileName));
         write(fd, " ", 1);
@@ -719,7 +721,7 @@ Boolean add_file_to_record(char *projectName, char *fileName, char *recordPath)
     freeRecord(record_arr, 'm', getRecordStructSize(record_arr));
     free(manifestData);
     close(fd);
-    printf("Successfully added to manifest!");
+    printf("Successfully added to manifest!\n");
 }
 
 Boolean remove_file_from_record(char *projectName, char *fileName, char *recordPath)
@@ -760,7 +762,7 @@ Boolean remove_file_from_record(char *projectName, char *fileName, char *recordP
     freeRecord(record_arr, 'm', getRecordStructSize(record_arr));
     free(fileData);
     close(fd);
-    printf("Successfully removed from manifest!");
+    printf("Successfully removed from manifest!\n");
 }
 
 //=================================================== CREATE ===============================================================
