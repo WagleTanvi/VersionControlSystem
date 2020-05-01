@@ -214,6 +214,8 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
     int w = write(sockfd, extended_commit_cmd, strlen(extended_commit_cmd));
     if (w < 0)
         printf("ERROR writing to the server.\n");
+
+    printf("%s\n", commit_file_content);
 }
 //=========================== UPGRADE METHODS==================================================================
 char *fetch_file_from_server(char *fileName, int sockfd)
@@ -1035,7 +1037,7 @@ char *read_from_server(int sockfd)
     /*Read the project name sent from the server.*/
     int len = read_len_message(sockfd);
     char *buffer = block_read(sockfd, len);
-    printf("%s\n", buffer);
+    //printf("%s\n", buffer);
     return buffer;
 }
 
@@ -1067,6 +1069,8 @@ int main(int argc, char **argv)
         sockfd = read_configure_and_connect();
         write_to_server(sockfd, argv[1], argv[2], argv[2]);
         char *buffer = read_from_server(sockfd);
+        printf("%s\n", buffer);
+
         /*disconnect server at the end!*/
         block_write(sockfd, "4:Done", 6);
         printf("Client Disconnecting");
@@ -1120,6 +1124,7 @@ int main(int argc, char **argv)
         /* Need to handle update error : project does not exist on server */
         sockfd = read_configure_and_connect();
         update(argv[2], sockfd);
+
         block_write(sockfd, "4:Done", 6);
         printf("Client Disconnecting\n");
         close(sockfd);
@@ -1129,6 +1134,8 @@ int main(int argc, char **argv)
         /* Need to handle update error : project does not exist on server */
         sockfd = read_configure_and_connect();
         upgrade(argv[2], sockfd);
+
+        /*disconnect*/
         block_write(sockfd, "4:Done", 6);
         printf("Client Disconnecting\n");
         close(sockfd);
@@ -1139,6 +1146,11 @@ int main(int argc, char **argv)
         write_to_server(sockfd, "manifest", argv[2], argv[2]);
         char *buffer = read_from_server(sockfd);
         write_commit_file(sockfd, argv[2], buffer);
+
+        /*disconnect*/
+        block_write(sockfd, "4:Done", 6);
+        printf("Client Disconnecting\n");
+        close(sockfd);
     }
     else if (argc == 3 && (strcmp(argv[1], "push") == 0))
     {
@@ -1181,6 +1193,7 @@ int main(int argc, char **argv)
             }
             else
             {
+                printf("%s\n", buffer);
                 break;
             }
         }
@@ -1190,6 +1203,11 @@ int main(int argc, char **argv)
         write_to_server(sockfd, "manifest", argv[2], argv[2]);
         char *buffer = read_from_server(sockfd);
         syncManifests(argv[2], buffer);
+
+        /*disconnect*/
+        block_write(sockfd, "4:Done", 6);
+        printf("Client Disconnecting\n");
+        close(sockfd);
     }
     else if (argc == 4 && (strcmp(argv[1], "rollback") == 0))
     {
@@ -1202,6 +1220,16 @@ int main(int argc, char **argv)
         strcat(sec_cmd, argv[3]); //version number
         write_to_server(sockfd, "rollback", sec_cmd, argv[2]);
         char *buffer = read_from_server(sockfd);
+        printf("%s\n", buffer);
+
+        char *old_name = (char *)malloc(strlen(argv[2]) + strlen("-old"));
+        old_name[0] = '\0';
+        strcat(old_name, argv[2]);
+        strcat(old_name, "-old");
+        write_to_server(sockfd, "destroy", old_name, old_name);
+        buffer = read_from_server(sockfd);
+
+        /*disconnect server at the end!*/
         block_write(sockfd, "4:Done", 6);
         printf("Client Disconnecting\n");
         close(sockfd);
@@ -1211,6 +1239,9 @@ int main(int argc, char **argv)
         sockfd = read_configure_and_connect();
         write_to_server(sockfd, "currentversion", argv[2], argv[2]);
         char *buffer = read_from_server(sockfd);
+        printf("%s\n", buffer);
+
+        /*disconnect*/
         block_write(sockfd, "4:Done", 6);
         printf("Client Disconnecting\n");
         close(sockfd);
@@ -1219,6 +1250,8 @@ int main(int argc, char **argv)
     {
         sockfd = read_configure_and_connect();
         get_history_file(argv[2], sockfd);
+
+        /*disconnect*/
         block_write(sockfd, "4:Done", 6);
         printf("Client Disconnecting\n");
         close(sockfd);
