@@ -496,7 +496,9 @@ void update(char *projectName, int sockfd)
     strcpy(manifestFilePath, projectName);
     strcat(manifestFilePath, "/.Manifest");
     char *fileData = read_file(manifestFilePath);
+    //printf("FILE DATA: %s", fileData);
     Record **manifestClient = create_record_struct(fileData, true);
+    //printAllRecords(manifestClient);
     // free(manifestFilePath);
     free(fileData);
     /* send manifest command */
@@ -529,8 +531,9 @@ void update(char *projectName, int sockfd)
         return;
     }
     Record **manifestServer = create_record_struct(serverData, true);
+    //printf("SERVER DATA: %s", serverData);
     free(serverData);
-    // printAllRecords(manifestClient);
+    //printAllRecords(manifestServer);
     /*check versions of both structs*/
     // versions are the same
     /* Update */
@@ -716,6 +719,7 @@ Boolean add_file_to_record(char *projectName, char *fileName, char *recordPath)
     freeRecord(record_arr, 'm', getRecordStructSize(record_arr));
     free(manifestData);
     close(fd);
+    printf("Successfully added to manifest!");
 }
 
 Boolean remove_file_from_record(char *projectName, char *fileName, char *recordPath)
@@ -756,6 +760,7 @@ Boolean remove_file_from_record(char *projectName, char *fileName, char *recordP
     freeRecord(record_arr, 'm', getRecordStructSize(record_arr));
     free(fileData);
     close(fd);
+    printf("Successfully removed from manifest!");
 }
 
 //=================================================== CREATE ===============================================================
@@ -788,7 +793,8 @@ void parseBuffer_create(char *buffer)
             if (tok[0] == 'P')
             {
                 char *projectName = substr(tok, 1, strlen(tok));
-                if(searchForProject(projectName) == true){
+                if (searchForProject(projectName) == true)
+                {
                     printf("ERROR project already exists!\n");
                     return;
                 }
@@ -949,7 +955,7 @@ int create_socket(char *host, char *port)
     int len = read_len_message(sockfd);
     //printf("%d\n", len);
     char *buffer = block_read(sockfd, len);
-    //printf("%s\n", buffer);
+    printf("%s\n", buffer);
     free(buffer);
 
     return sockfd;
@@ -1004,7 +1010,7 @@ void write_to_server(int sockfd, char *argv1, char *argv2, char *project_name)
     strcat(new_command, ":");
     strcat(new_command, command);
     block_write(sockfd, new_command, strlen(new_command));
-    
+
     free(command);
     free(new_command);
 }
@@ -1031,9 +1037,10 @@ int main(int argc, char **argv)
     {
         sockfd = read_configure_and_connect();
         write_to_server(sockfd, argv[1], argv[2], argv[2]);
-        
+
         char *buffer = read_from_server(sockfd);
-        if(strcmp(buffer, "ERROR the project already exists on server.")!=0){
+        if (strcmp(buffer, "ERROR the project already exists on server.") != 0)
+        {
             parseBuffer_create(buffer);
         }
         /*disconnect server at the end!*/
@@ -1047,7 +1054,7 @@ int main(int argc, char **argv)
         write_to_server(sockfd, argv[1], argv[2], argv[2]);
         char *buffer = read_from_server(sockfd);
         /*disconnect server at the end!*/
-        block_write(sockfd, "4:Done", 4);
+        block_write(sockfd, "4:Done", 6);
         printf("Client Disconnecting");
         close(sockfd);
     }
@@ -1116,7 +1123,7 @@ int main(int argc, char **argv)
     {
         sockfd = read_configure_and_connect();
         write_to_server(sockfd, "manifest", argv[2], argv[2]);
-        char* buffer = read_from_server(sockfd);
+        char *buffer = read_from_server(sockfd);
         write_commit_file(sockfd, argv[2], buffer);
     }
     else if (argc == 3 && (strcmp(argv[1], "push") == 0))
@@ -1151,28 +1158,32 @@ int main(int argc, char **argv)
 
         /*write to the server*/
         write_to_server(sockfd, argv[1], sec_cmd, argv[2]);
-        while(1){
-            char* buffer = read_from_server(sockfd);
-            if(strstr(buffer, "sendfile")!=NULL){
+        while (1)
+        {
+            char *buffer = read_from_server(sockfd);
+            if (strstr(buffer, "sendfile") != NULL)
+            {
                 fetchFile(buffer, sockfd);
-            } else {
+            }
+            else
+            {
                 break;
             }
-        } 
+        }
         remove_commit_file(sockfd, argv[2]);
-        increment_manifest_version(argv[2], sockfd);
+        //increment_manifest_version(argv[2], sockfd);
     }
     else if (argc == 4 && (strcmp(argv[1], "rollback") == 0))
     {
         sockfd = read_configure_and_connect();
-        char* sec_cmd = (char*)malloc(strlen(argv[2])+1+digits(strlen(argv[3]))+1+strlen(argv[3]));
+        char *sec_cmd = (char *)malloc(strlen(argv[2]) + 1 + digits(strlen(argv[3])) + 1 + strlen(argv[3]));
         strcat(sec_cmd, argv[2]); //project name
         strcat(sec_cmd, ":");
         strcat(sec_cmd, to_Str(strlen(argv[3])));
         strcat(sec_cmd, ":");
         strcat(sec_cmd, argv[3]); //version number
         write_to_server(sockfd, "rollback", sec_cmd, argv[2]);
-        char* buffer = read_from_server(sockfd);
+        char *buffer = read_from_server(sockfd);
         block_write(sockfd, "4:Done", 6);
         printf("Client Disconnecting\n");
         close(sockfd);
@@ -1181,7 +1192,7 @@ int main(int argc, char **argv)
     {
         sockfd = read_configure_and_connect();
         write_to_server(sockfd, "currentversion", argv[2], argv[2]);
-        char* buffer = read_from_server(sockfd);
+        char *buffer = read_from_server(sockfd);
         block_write(sockfd, "4:Done", 6);
         printf("Client Disconnecting\n");
         close(sockfd);
