@@ -1,6 +1,17 @@
 #include "header-files/helper.h"
 #include "header-files/record.h"
 
+void syncManifests(char* project_name, char* buffer){
+    char *manifest = (char *)malloc(strlen(project_name) + strlen("./Manifest") * sizeof(char));
+    manifest[0] = '\0';
+    strcat(manifest, project_name);
+    strcat(manifest, "/.Manifest");
+    int new_manifest_file = open(manifest, O_WRONLY | O_CREAT | O_TRUNC, 0775);
+    int w = write(new_manifest_file, buffer, strlen(buffer));
+    if(w < 0)
+        printf("ERROR writing to the manifest.\n");
+}
+
 //========================HASHING===================================================
 unsigned char *getHash(char *s)
 {
@@ -1160,6 +1171,12 @@ int main(int argc, char **argv)
             }
         } 
         remove_commit_file(sockfd, argv[2]);
+
+        /*sync the server and client manifests*/
+        write_to_server(sockfd, "manifest", argv[2], argv[2]);
+        char* buffer = read_from_server(sockfd);
+        syncManifests(argv[2], buffer);
+
     }
     else if (argc == 4 && (strcmp(argv[1], "rollback") == 0))
     {
