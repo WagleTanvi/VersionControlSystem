@@ -313,6 +313,35 @@ void duplicate_dir(char *project_path, char *new_project_path)
     closedir(dir);
 }
 
+void expire_pending_commits(char* project_name, char* good_commit){
+    char path[4096];
+    struct dirent *d;
+
+    char *pserver = (char *)malloc(strlen(project_name) + strlen("/pending-commits"));
+    pserver[0] = '\0';
+    strcat(pserver, project_name);
+    strcat(pserver, "/pending-commits");
+    
+    DIR *dir = opendir(pserver);
+    if (dir == NULL)
+    {
+        printf("ERROR this is not a directory.\n");
+        return;
+    }
+    while ((d = readdir(dir)) != NULL)
+    {
+        snprintf(path, 4096, "%s/%s", pserver, d->d_name);
+        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0)
+            continue;
+        if(strcmp(d->d_name, good_commit)==0){
+            continue;
+        } else {
+            int u = unlink(path);
+        }
+    }
+    closedir(dir);
+}
+
 //push:23:projectname:234:blahblahcommintcontent
 void push_commits(char *buffer, int clientSoc)
 {
@@ -329,6 +358,7 @@ void push_commits(char *buffer, int clientSoc)
     int foundProj = search_proj_exists(project_name);
     if (foundProj == 0)
     {
+        expire_pending_commits(project_name, "");
         free(project_name);
         int n = write(clientSoc, "ERROR project not in the server.\n", 36);
         if (n < 0)
@@ -358,6 +388,7 @@ void push_commits(char *buffer, int clientSoc)
     strcat(pserver, hostname);
     char* server_file_content = getFileContent(pserver, "");
     if(strcmp(file_content, server_file_content)!=0){
+        expire_pending_commits(project_name, "");
         printf("ERROR the client and sever commit files do not match.\n");
         return;
     }
@@ -365,6 +396,14 @@ void push_commits(char *buffer, int clientSoc)
     char* format_str = current_version_format(project_name);
     char* version_num = get_current_version(format_str, clientSoc, 'N');
     save_history(server_file_content, project_name, version_num);
+
+    /*Expire the other pending commits*/
+    char *good_commit = (char *)malloc(strlen(hostname) + strlen(".Commit-"));
+    good_commit[0] = '\0';
+    strcat(good_commit, ".Commit-");
+    strcat(good_commit, hostname);
+    expire_pending_commits(project_name, good_commit);
+
     free(server_file_content);
     free(format_str);
 
@@ -436,7 +475,9 @@ void push_commits(char *buffer, int clientSoc)
             }
             else
             {
+                expire_pending_commits(project_name, "");
                 printf("ERROR could not find the file in the manifest. Update?\n");
+                return;
             }
             char *newContent = fetch_file_from_client(filepath, clientSoc);
             if (newContent == NULL)
@@ -453,7 +494,9 @@ void push_commits(char *buffer, int clientSoc)
                 int fd = open(filepath, O_WRONLY | O_TRUNC);
                 if (fd == -1)
                 {
+                    expire_pending_commits(project_name, "");
                     printf("Fatal Error: Could not open Update file");
+                    return;
                 }
                 block_write(fd, newContent, strlen(newContent));
             pthread_mutex_unlock(&m);
@@ -465,6 +508,7 @@ void push_commits(char *buffer, int clientSoc)
             int new_file = open(filepath, O_WRONLY | O_CREAT | O_TRUNC, 0775);
             if (new_file < 0)
             {
+                expire_pending_commits(project_name, "");
                 printf("ERROR unable to make new file: %s\n", strerror(errno));
                 return;
             }
@@ -472,7 +516,9 @@ void push_commits(char *buffer, int clientSoc)
             Record *manifest_rec = search_record(server_manifest, filepath);
             if (manifest_rec != NULL)
             {
+                expire_pending_commits(project_name, "");
                 printf("ERROR already exists in manifest.\n");
+                return;
             }
             else
             {
@@ -500,7 +546,9 @@ void push_commits(char *buffer, int clientSoc)
             int fd = open(filepath, O_WRONLY | O_CREAT | O_TRUNC, 00600);
             if (fd == -1)
             {
+                expire_pending_commits(project_name, "");
                 printf("Fatal Error: Could not open Update file");
+                return;
             }
             block_write(fd, newContent, strlen(newContent));
         }
