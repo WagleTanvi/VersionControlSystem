@@ -154,7 +154,7 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
             write(commit_fd, " ", 1);
             write(commit_fd, file_name, strlen(file_name));
             write(commit_fd, " ", 1);
-            write(commit_fd, client_manifest[i]->hash, strlen(client_manifest[i]->hash));
+            write(commit_fd, live_hash_arr[i], strlen(live_hash_arr[i]));
             write(commit_fd, "\n", 1);
             /*increment the file version*/
             int client_file_version = atoi(client_manifest[i]->version);
@@ -949,7 +949,7 @@ int create_socket(char *host, char *port)
     int len = read_len_message(sockfd);
     //printf("%d\n", len);
     char *buffer = block_read(sockfd, len);
-    //printf("%s\n", buffer);
+    printf("%s\n", buffer);
     free(buffer);
 
     return sockfd;
@@ -1047,7 +1047,7 @@ int main(int argc, char **argv)
         write_to_server(sockfd, argv[1], argv[2], argv[2]);
         char *buffer = read_from_server(sockfd);
         /*disconnect server at the end!*/
-        block_write(sockfd, "4:Done", 4);
+        block_write(sockfd, "4:Done", 6);
         printf("Client Disconnecting");
         close(sockfd);
     }
@@ -1160,7 +1160,6 @@ int main(int argc, char **argv)
             }
         } 
         remove_commit_file(sockfd, argv[2]);
-        increment_manifest_version(argv[2], sockfd);
     }
     else if (argc == 4 && (strcmp(argv[1], "rollback") == 0))
     {
