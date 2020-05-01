@@ -431,7 +431,7 @@ void push_commits(char *buffer, int clientSoc)
             Record *client_manifest_rec = search_record(client_manifest, filepath);
             if (manifest_rec != NULL)
             {
-                manifest_rec->version = to_Str(atoi(client_manifest_rec->version));
+                manifest_rec->version = to_Str(atoi(client_manifest_rec->version)+1);
                 manifest_rec->hash = active_commit[x]->hash;
             }
             else
@@ -1059,7 +1059,7 @@ void createProject(char *buffer, int clientSoc)
             printf("ERROR unable to make manifestFile: %s\n", strerror(errno));
             return;
         }
-        write(manifestFile, "1\n", 2);
+        write(manifestFile, "0\n", 2);
         free(pserver);
     }
     else if (strcmp(cmd, "checkout") == 0)
@@ -1268,7 +1268,9 @@ void *mainThread(void *arg)
             break;
         }
         else if(strcmp(buffer, "Successfully connected to client.\n")==0){
+            printf("%s\n", buffer);
             block_write(clientSock, "34:Successfully connected to server.\n", 37);
+            
         }
         else{
             parseRead(buffer, clientSock);
