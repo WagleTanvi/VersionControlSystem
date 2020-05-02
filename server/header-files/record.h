@@ -17,6 +17,6 @@ Record* search_record(Record** record_arr, char* targetFile);
 char* printRecord(Record* record);
 
 /* Free Record Array */
-void freeRecord(Record** record_arr);
+void freeRecord(Record **record_arr, char flag, int size);
 
 #endif

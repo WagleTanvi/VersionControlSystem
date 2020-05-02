@@ -192,28 +192,14 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
         i++;
     }
 
-    /*Send the commit file to the server*/
+    /*check that commit is not empty- if empty then delete*/
     char *commit_file_content = read_file(commit_path);
-    char *length_of_commit = to_Str(strlen(commit_file_content));
-    char *send_commit_to_server = (char *)malloc(strlen("commit") + digits(strlen(project_name)) + strlen(project_name) + digits(atoi(length_of_commit)) + strlen(commit_file_content) + 4 * sizeof(char));
-    send_commit_to_server[0] = '\0';
-    strcat(send_commit_to_server, "commit");
-    strcat(send_commit_to_server, ":");
-    strcat(send_commit_to_server, to_Str(strlen(project_name)));
-    strcat(send_commit_to_server, ":");
-    strcat(send_commit_to_server, project_name);
-    strcat(send_commit_to_server, ":");
-    strcat(send_commit_to_server, length_of_commit);
-    strcat(send_commit_to_server, ":");
-    strcat(send_commit_to_server, commit_file_content);
-    char *extended_commit_cmd = (char *)malloc(digits(strlen(send_commit_to_server) + strlen(send_commit_to_server) + 1 * sizeof(char)));
-    extended_commit_cmd[0] = '\0';
-    strcat(extended_commit_cmd, to_Str(strlen(send_commit_to_server) + 1));
-    strcat(extended_commit_cmd, ":");
-    strcat(extended_commit_cmd, send_commit_to_server);
-    int w = write(sockfd, extended_commit_cmd, strlen(extended_commit_cmd));
-    if (w < 0)
-        printf("ERROR writing to the server.\n");
+    if (strcmp(commit_file_content, "") == 0)
+    {
+        printf("There are no changes to be commited.\n");
+        unlink(commit_path);
+        return;
+    }
 
     printf("%s\n", commit_file_content);
 }
@@ -855,8 +841,7 @@ void get_history_file(char *projectName, int sockfd)
     {
         return;
     }
-    printf("History for %s\n%s", projectName, newContent);
-    printf("Hello!\n");
+    printf("History for %s:\n%s\n", projectName, newContent);
 }
 //=========================== SOCKET/CONFIGURE METHODS==================================================================
 /* delay function - DOESNT really WORK*/
@@ -1055,13 +1040,18 @@ int main(int argc, char **argv)
         write_to_server(sockfd, argv[1], argv[2], argv[2]);
 
         char *buffer = read_from_server(sockfd);
-        if (strcmp(buffer, "ERROR the project already exists on server.") != 0)
+        if (strstr(buffer, "create") != NULL)
         {
             parseBuffer_create(buffer);
+            printf("Successfully created project!\n");
+        }
+        else
+        {
+            printf("%s\n", buffer);
         }
         /*disconnect server at the end!*/
         block_write(sockfd, "4:Done", 6);
-        printf("Client Disconnecting");
+        printf("Client Disconnecting.\n.\n");
         close(sockfd);
     }
     else if (argc == 3 && (strcmp(argv[1], "destroy") == 0))
@@ -1073,7 +1063,7 @@ int main(int argc, char **argv)
 
         /*disconnect server at the end!*/
         block_write(sockfd, "4:Done", 6);
-        printf("Client Disconnecting");
+        printf("Client Disconnecting.\n");
         close(sockfd);
     }
     else if (argc == 4 && (strcmp(argv[1], "add") == 0 || strcmp(argv[1], "remove") == 0))
@@ -1147,6 +1137,29 @@ int main(int argc, char **argv)
         char *buffer = read_from_server(sockfd);
         write_commit_file(sockfd, argv[2], buffer);
 
+        /*Send the commit file to the server
+            34:commit:23:projectname:234:commitdata
+        */
+
+        char *commit_file = (char *)malloc(strlen(argv[2]) + strlen("/.Commit"));
+        commit_file[0] = '\0';
+        strcat(commit_file, argv[2]);
+        strcat(commit_file, "/.Commit");
+        char *commit_file_content = read_file(commit_file);
+        char *length_of_commit = to_Str(strlen(commit_file_content));
+
+        char *send_commit_to_server = (char *)malloc(strlen(argv[2]) + strlen(length_of_commit) + strlen(commit_file_content) * sizeof(char));
+        send_commit_to_server[0] = '\0';
+        strcat(send_commit_to_server, argv[2]);
+        strcat(send_commit_to_server, ":");
+        strcat(send_commit_to_server, length_of_commit);
+        strcat(send_commit_to_server, ":");
+        strcat(send_commit_to_server, commit_file_content);
+
+        write_to_server(sockfd, "commit", send_commit_to_server, argv[2]);
+        buffer = read_from_server(sockfd);
+        printf("%s\n", buffer);
+
         /*disconnect*/
         block_write(sockfd, "4:Done", 6);
         printf("Client Disconnecting\n");
@@ -1161,6 +1174,16 @@ int main(int argc, char **argv)
         strcat(commit_file, argv[2]);
         strcat(commit_file, "/.Commit");
         char *commitfile_content = read_file(commit_file);
+        if (commitfile_content == NULL)
+        {
+            printf("ERROR there are no commits to be pushed.\n");
+            /*disconnect*/
+            free(commit_file);
+            block_write(sockfd, "4:Done", 6);
+            printf("Client Disconnecting\n");
+            close(sockfd);
+            return;
+        }
 
         /*Get the data from the manifest file*/
         char *manifest_file = (char *)malloc(strlen(argv[2]) + strlen("/.Manifest"));
@@ -1168,6 +1191,17 @@ int main(int argc, char **argv)
         strcat(manifest_file, argv[2]);
         strcat(manifest_file, "/.Manifest");
         char *manifest_file_content = read_file(manifest_file);
+        if (commitfile_content == NULL)
+        {
+            printf("FATAL ERROR there is no manifest file.\n");
+            /*disconnect*/
+            free(commit_file);
+            free(manifest_file);
+            block_write(sockfd, "4:Done", 6);
+            printf("Client Disconnecting\n");
+            close(sockfd);
+            return;
+        }
 
         /*attach everything*/
         char *sec_cmd = (char *)malloc(strlen(argv[2]) + 1 + digits(strlen(commitfile_content)) + 1 + strlen(commitfile_content) + 1 + digits(strlen(manifest_file_content)) + 1 + strlen(manifest_file_content));
