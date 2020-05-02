@@ -1186,9 +1186,8 @@ int main(int argc, char **argv)
             block_write(sockfd, "4:Done", 6);
             printf("Client Disconnecting\n");
             close(sockfd);
+            return;
         }
-
-
         char *commit_file = (char *)malloc(strlen(argv[2]) + strlen("/.Commit"));
         commit_file[0] = '\0';
         strcat(commit_file, argv[2]);
@@ -1301,6 +1300,7 @@ int main(int argc, char **argv)
     {
         sockfd = read_configure_and_connect();
         char *sec_cmd = (char *)malloc(strlen(argv[2]) + 1 + digits(strlen(argv[3])) + 1 + strlen(argv[3]));
+        sec_cmd[0] = '\0';
         strcat(sec_cmd, argv[2]); //project name
         strcat(sec_cmd, ":");
         strcat(sec_cmd, to_Str(strlen(argv[3])));

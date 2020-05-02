@@ -306,11 +306,11 @@ void duplicate_dir(char *project_path, const char *new_project_path)
     {
         snprintf(path, 4096, "%s/%s", project_path, d->d_name);
         snprintf(newpath, 4096, "%s/%s", new_project_path, d->d_name);
-        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0 || strcmp(d->d_name, "pending-commits") == 0)
+        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0 || strcmp(d->d_name, "pending-commits") == 0 || strcmp(d->d_name, "history") == 0)
             continue;
         if (d->d_type == DT_DIR)
         {
-            duplicate_dir(path, new_project_path);
+            duplicate_dir(path, newpath);
         }
         else
         {
@@ -377,7 +377,7 @@ void push_commits(char *buffer, int clientSoc)
     if (foundProj == 0)
     {
         expire_pending_commits(project_name, "");
-        free(project_name);
+        //free(project_name);
         block_write(clientSoc, "33:ERROR project not in the server.\n", 36);
         return;
     }
@@ -393,7 +393,7 @@ void push_commits(char *buffer, int clientSoc)
     bcount += (strlen(size) + 1);
     char *file_content = getSubstring(bcount, buffer, atoi(size));
     bcount += (strlen(file_content) + 1);
-    free(size);
+    //free(size);
 
     /*Get server commit file and compare with the client commit file*/
     char *hostname = get_host_name();
@@ -407,9 +407,9 @@ void push_commits(char *buffer, int clientSoc)
     /*server commit file doesn't exist*/
     if(server_file_content == NULL){
         expire_pending_commits(project_name, "");
-        free(project_name);
-        free(file_content);
-        free(pserver);
+        // free(project_name);
+        // free(file_content);
+        // free(pserver);
         block_write(clientSoc, "21:Push command failed!\n", 24);
         return;
     }
@@ -423,9 +423,9 @@ void push_commits(char *buffer, int clientSoc)
             printf("ERROR the client and sever commit files do not match.\n");
         }
         expire_pending_commits(project_name, "");
-        free(project_name);
-        free(file_content);
-        free(pserver);
+        // free(project_name);
+        // free(file_content);
+        // free(pserver);
         block_write(clientSoc, "21:Push command failed!\n", 24);
         return;
     }
@@ -443,9 +443,9 @@ void push_commits(char *buffer, int clientSoc)
     strcat(good_commit, hostname);
     expire_pending_commits(project_name, good_commit);
 
-    free(server_file_content);
-    free(format_str);
-    free(good_commit);
+    // free(server_file_content);
+    // free(format_str);
+    // free(good_commit);
 
     /*Get the manifest file data*/
     count = bcount;
@@ -458,7 +458,7 @@ void push_commits(char *buffer, int clientSoc)
     bcount += (strlen(size2) + 1);
     char *file_content2 = getSubstring(bcount, buffer, atoi(size2));
     bcount += (strlen(file_content2) + 1);
-    free(size2);
+  //  free(size2);
 
     /*Get the current server manifest that is in the folder*/
     char *manifestpath = (char *)malloc(strlen(project_name) + strlen("./Manifest") * sizeof(char));
@@ -468,12 +468,12 @@ void push_commits(char *buffer, int clientSoc)
     char *manifest_data = getFileContent(manifestpath, "");
     Record **server_manifest = create_record_struct(manifest_data, num, 'M');
     int server_manifest_size = getRecordStructSize(server_manifest);
-    free(manifest_data);
+   // free(manifest_data);
 
     /*Get the client manifest- make it into a record struct*/
     Record **client_manifest = create_record_struct(file_content2, 0, 'M');
     int client_manifest_size = getRecordStructSize(server_manifest);
-    free(file_content2);
+  //  free(file_content2);
 
     /*make a history folder to store all the old commits*/
     char *history_dir = (char *)malloc(strlen(project_name) + strlen("/history\0") * sizeof(char));
@@ -484,7 +484,7 @@ void push_commits(char *buffer, int clientSoc)
     int ch = chmod(history_dir, 0775);
     if (ch < 0)
         printf("ERROR set permission error.\n");
-    free(history_dir);
+   // free(history_dir);
 
     /*move old project to the history folder*/
     char *new_project_name = (char *)malloc(strlen(project_name) + 3 * sizeof(char));
@@ -501,9 +501,9 @@ void push_commits(char *buffer, int clientSoc)
     strcat(new_project_path, "/history/");
     strcat(new_project_path, new_project_name);
     duplicate_dir(project_name, new_project_path);
-    free(v_len);
-    free(new_project_name);
-    free(new_project_path);
+    // free(v_len);
+    // free(new_project_name);
+    // free(new_project_path);
 
     /*do the stuff that is in the commit-modify the manifest too*/
     Record **active_commit = create_record_struct(file_content, 0, 'C');
