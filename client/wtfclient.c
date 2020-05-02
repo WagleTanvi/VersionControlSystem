@@ -59,7 +59,7 @@ void remove_commit_file(int sockfd, char *project_name)
 }
 
 /*Sends the commit file to the server.*/
-void write_commit_file(int sockfd, char *project_name, char *server_record_data)
+char* write_commit_file(int sockfd, char *project_name, char *server_record_data)
 {
     //first check if the client has updates to be made
     char *pclient = (char *)malloc(strlen(project_name) + strlen("./Update") * sizeof(char));
@@ -72,7 +72,7 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
         {
             free(pclient);
             printf("ERROR update file not empty. Please update project!.\n");
-            return;
+            return "error";
         }
     }
     // free(pclient);
@@ -86,7 +86,7 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
     {
         free(pclient2);
         printf("ERROR conflicts still exist. Please resolve conflicts first.\n");
-        return;
+        return "error";
     }
     // free(pclient2);
 
@@ -110,7 +110,7 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
         free(client_manifest_data);
         freeRecord(server_manifest, 'm', getRecordStructSize(server_manifest));
         freeRecord(client_manifest, 'm', getRecordStructSize(server_manifest));
-        return;
+        return "error";
     }
 
     /*compute an array of live hashes*/
@@ -154,7 +154,7 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
                     close(commit_fd);
                     unlink(commit_path); //delete /Commit file
                     printf("ERROR client needs to synch repository with server before committing.\n");
-                    return;
+                    return "error";
                 }
 
                 /*write that client modified the file*/
@@ -237,8 +237,10 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
     {
         printf("There are no changes to be commited.\n");
         unlink(commit_path);
-        return;
+        return "error";
     }
+
+    return "success";
 
     // printf("%s\n", commit_file_content);
 }
@@ -1174,11 +1176,18 @@ int main(int argc, char **argv)
         sockfd = read_configure_and_connect();
         write_to_server(sockfd, "manifest", argv[2], argv[2]);
         char *buffer = read_from_server(sockfd);
-        write_commit_file(sockfd, argv[2], buffer);
+        char* s = write_commit_file(sockfd, argv[2], buffer);
 
         /*Send the commit file to the server
             34:commit:23:projectname:234:commitdata
         */
+        if(strcmp(s, "error") == 0){
+            /*disconnect*/
+            block_write(sockfd, "4:Done", 6);
+            printf("Client Disconnecting\n");
+            close(sockfd);
+        }
+
 
         char *commit_file = (char *)malloc(strlen(argv[2]) + strlen("/.Commit"));
         commit_file[0] = '\0';

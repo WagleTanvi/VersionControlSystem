@@ -82,7 +82,7 @@ char **getLiveHashes(Record **record_arr, int size);
 void remove_commit_file(int sockfd, char* project_name);
 
 /*Sends the commit file to the server.*/
-void write_commit_file(int sockfd, char *project_name, char *server_record_data);
+char* write_commit_file(int sockfd, char *project_name, char *server_record_data);
 
 //=========================== UPGRADE METHODS==================================================================
 char *fetch_file_from_server(char *fileName, int sockfd);
