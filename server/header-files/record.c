@@ -113,18 +113,39 @@ char* printRecord(Record* record){
 }
 
 /* Free Record Array */
-void freeRecord(Record** record_arr){
-    int size = getRecordStructSize(record_arr);
-    free(record_arr[0]->version);
-    free(record_arr[0]->hash);
-    free(record_arr[0]);
-    int x = 1;
-    while (x < size){
-        free(record_arr[x]->version);
-        free(record_arr[x]->file);
-        free(record_arr[x]->hash);
-        free(record_arr[x]);
+// u = update/commmit/conflict file
+// m = manifest file
+// a = appended records
+void freeRecord(Record **record_arr, char flag, int size)
+{
+    int s = size;
+    int x = 0;
+    if (flag == 'm')
+    {
+        free(record_arr[0]->version);
+    }
+    if (flag == 'm' || flag == 'u')
+    {
+        free(record_arr[0]->hash);
+        if (record_arr[0] != NULL)
+        {
+            free(record_arr[0]);
+        }
+        x = 1;
+    }
+    while (x < s)
+    {
+        if (record_arr[x] != NULL)
+        {
+            free(record_arr[x]->version);
+            free(record_arr[x]->file);
+            free(record_arr[x]->hash);
+            free(record_arr[x]);
+        }
         x++;
     }
-    free(record_arr);
+    if (record_arr != NULL)
+    {
+        free(record_arr);
+    }
 }
