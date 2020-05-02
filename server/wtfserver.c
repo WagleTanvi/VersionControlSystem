@@ -682,18 +682,18 @@ void push_commits(char *buffer, int clientSoc)
         else if (strcmp(active_commit[x]->version, "D") == 0)
         {
             char *filepath = active_commit[x]->file;
-            x = 1;
+            int y = 1;
             int size = getRecordStructSize(server_manifest);
-            while (x < size){
-                if (server_manifest[x] != NULL && server_manifest[x]->file != NULL && strcmp(server_manifest[x]->file, filepath) == 0){
-                    free(server_manifest[x]->version);
-                    free(server_manifest[x]->file);
-                    free(server_manifest[x]->hash);
-                    free(server_manifest[x]);
-                    server_manifest[x] = NULL;
+            while (y < size){
+                if (server_manifest[y] != NULL && server_manifest[y]->file != NULL && strcmp(server_manifest[y]->file, filepath) == 0){
+                    free(server_manifest[y]->version);
+                    free(server_manifest[y]->file);
+                    free(server_manifest[y]->hash);
+                    free(server_manifest[y]);
+                    server_manifest[y] = NULL;
 
                 }
-                x++;
+                y++;
             }
             int r = remove(filepath);
         }

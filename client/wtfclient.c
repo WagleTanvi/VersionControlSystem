@@ -122,6 +122,14 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
     snprintf(commit_path, path_len + 1, "%s%s", project_name, "/.Commit");
     commit_path[path_len + 1] = '\0';
     int commit_fd = open(commit_path, O_WRONLY | O_CREAT | O_APPEND, 00600);
+    
+    /*create a record for the commit file - this is only if it already exists*/
+    char* commit_content = read_file(commit_path);
+    Record** commit_file_record = NULL;
+    if(strcmp(commit_content, "") != 0){
+        /*This is probably not your first time commiting something*/
+        Record** commit_file_record = create_record_struct(commit_content, false);
+    }
 
     /*go through each file in client manifest and compare manifests and write commit file*/
     int i = 1;
@@ -152,19 +160,32 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
                 /*write that client modified the file*/
                 //char* file_version = increment_file_version(client_manifest[i]->version); //where is the file version being incremented (seems like the manifest)
                 write(commit_fd, "M", 1);
+                printf("%s ", "M ");
                 write_file = true;
             }
         }
         else
         {
-            /*write that client added a file*/
-            write(commit_fd, "A", 1);
-            write_file = true;
+            if(commit_file_record != NULL){
+                Boolean found_commit = search_Record(commit_file_record, file_name);
+                if(found_commit == false){
+                    /*write that client added a file*/
+                    write(commit_fd, "A", 1);
+                    write_file = true;
+                } else {
+                    write_file = false;
+                }
+            } else {
+                write(commit_fd, "A", 1);
+                printf("%s ", "A ");
+                write_file = true;
+            }
         }
         if (write_file == true)
         {
             write(commit_fd, " ", 1);
             write(commit_fd, file_name, strlen(file_name));
+            printf("%s\n", file_name);
             write(commit_fd, " ", 1);
             write(commit_fd, live_hash_arr[i], strlen(live_hash_arr[i]));
             write(commit_fd, "\n", 1);
@@ -178,16 +199,24 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
     while (i < server_manifest_size)
     {
         char *file_name = server_manifest[i]->file;
+
         Boolean found_file = search_Record(client_manifest, file_name);
         if (found_file == false)
         {
-            /*write that client deleted a file*/
-            write(commit_fd, "D", 1);
-            write(commit_fd, " ", 1);
-            write(commit_fd, file_name, strlen(file_name));
-            write(commit_fd, " ", 1);
-            write(commit_fd, server_manifest[i]->hash, strlen(server_manifest[i]->hash));
-            write(commit_fd, "\n", 1);
+            if(commit_file_record != NULL){
+                Boolean found_commit = search_Record(commit_file_record, file_name);
+                if(found_commit == false){
+                    /*write that client deleted a file*/
+                    write(commit_fd, "D", 1);
+                    printf("%s ", "D ");
+                    write(commit_fd, " ", 1);
+                    write(commit_fd, file_name, strlen(file_name));
+                    printf("%s\n", file_name);
+                    write(commit_fd, " ", 1);
+                    write(commit_fd, server_manifest[i]->hash, strlen(server_manifest[i]->hash));
+                    write(commit_fd, "\n", 1);
+                }
+            }
         }
         i++;
     }
@@ -201,7 +230,7 @@ void write_commit_file(int sockfd, char *project_name, char *server_record_data)
         return;
     }
 
-    printf("%s\n", commit_file_content);
+    // printf("%s\n", commit_file_content);
 }
 //=========================== UPGRADE METHODS==================================================================
 char *fetch_file_from_server(char *fileName, int sockfd)
@@ -1040,7 +1069,7 @@ int main(int argc, char **argv)
         write_to_server(sockfd, argv[1], argv[2], argv[2]);
 
         char *buffer = read_from_server(sockfd);
-        if (strstr(buffer, "create") != NULL)
+        if (strstr(buffer, "create") != NULL || strstr(buffer, "checkout") != NULL)
         {
             parseBuffer_create(buffer);
             printf("Successfully created project!\n");
@@ -1146,6 +1175,12 @@ int main(int argc, char **argv)
         strcat(commit_file, argv[2]);
         strcat(commit_file, "/.Commit");
         char *commit_file_content = read_file(commit_file);
+        if(commit_file_content == NULL){
+            /*disconnect*/
+            block_write(sockfd, "4:Done", 6);
+            printf("Client Disconnecting\n");
+            close(sockfd);   
+        }
         char *length_of_commit = to_Str(strlen(commit_file_content));
 
         char *send_commit_to_server = (char *)malloc(strlen(argv[2]) + strlen(length_of_commit) + strlen(commit_file_content) * sizeof(char));
