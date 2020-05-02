@@ -12,6 +12,25 @@ int cmd_count = 0;
 MutexArray* array_of_mutexes[5];
 int array_of_mutexes_size = 5;
 
+char *extract_path(char *path)
+{
+    int size = strlen(path);
+    int x = size - 1;
+    while (x >= 0)
+    {
+        if (path[x] == '/')
+        {
+            break;
+        }
+        x--;
+    }
+    char *temp = (char *)malloc(sizeof(char) * x + 2);
+    strncpy(temp, path, x + 1);
+    temp[x + 1] = '\0';
+    //printf("%s\n", temp);
+    return temp;
+}
+
 /*Returns all the projects in the CWD*/
 int find_all_projects(){
     char path[4096];
@@ -538,7 +557,7 @@ void push_commits(char *buffer, int clientSoc)
                 block_write(clientSoc, "21:Push command failed!\n", 24);
                 return;
             }
-            mkdir_recursive(filepath); //for subdirectories ^_^ (hopefully it works)
+            // mkdir_recursive(filepath); //for subdirectories ^_^ (hopefully it works)
             int fd = open(filepath, O_WRONLY | O_TRUNC);
             if (fd == -1)
             {
@@ -564,6 +583,20 @@ void push_commits(char *buffer, int clientSoc)
         { //add file
             /*make commit file*/
             char *filepath = active_commit[x]->file;
+
+            /*handle subdirectories*/
+            char *subdirPath = extract_path(filepath);
+            char *projTemp = (char *)malloc(sizeof(char) * strlen(project_name) + 2);
+            strcpy(projTemp, project_name);
+            strcat(project_name, "/");
+            projTemp[strlen(project_name) + 1] = '\0';
+            if (strcmp(subdirPath, projTemp) != 0)
+            {
+                mkdir_recursive(subdirPath);
+            }
+            free(subdirPath);
+            free(projTemp);
+
             int new_file = open(filepath, O_WRONLY | O_CREAT | O_TRUNC, 0775);
             if (new_file < 0)
             {
