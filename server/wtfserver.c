@@ -268,7 +268,7 @@ void rollback(char *buffer, int clientSoc)
     strcat(project_path, project_name);
     strcat(project_path, "/history/\0");
     strcat(project_path, new_project_name);
-    duplicate_dir(project_path, new_project_name);
+    duplicate_dir(project_path, new_project_name, false);
 
     /*Renaming doesn't work for some reason >__<*/
     count = 0;
@@ -305,8 +305,11 @@ void rollback(char *buffer, int clientSoc)
 //=============================== PUSH ======================
 
 /*Given a project name, duplicate the directory*/
-void duplicate_dir(char *project_path, const char *new_project_path)
+void duplicate_dir(char *project_path, const char *new_project_path, Boolean history)
 {
+    if(history == true){
+        return;
+    }
     char path[4096];
     char newpath[4096];
     struct dirent *d;
@@ -323,9 +326,12 @@ void duplicate_dir(char *project_path, const char *new_project_path)
         snprintf(newpath, 4096, "%s/%s", new_project_path, d->d_name);
         if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0 || strcmp(d->d_name, "pending-commits") == 0)
             continue;
+        else if(strcmp(d->d_name, "history")==0){
+            history = true;
+        }
         if (d->d_type == DT_DIR)
         {
-            duplicate_dir(path, newpath);
+            duplicate_dir(path, newpath, history);
         }
         else
         {
@@ -528,7 +534,7 @@ void push_commits(char *buffer, int clientSoc)
     strcat(new_project_path, project_name);
     strcat(new_project_path, "/history/");
     strcat(new_project_path, new_project_name);
-    duplicate_dir(project_name, new_project_path);
+    duplicate_dir(project_name, new_project_path, false);
     // free(v_len);
     // free(new_project_name);
     // free(new_project_path);

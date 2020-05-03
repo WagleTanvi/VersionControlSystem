@@ -84,7 +84,7 @@ void rollback(char* buffer, int clientSoc);
 
 //=============================== PUSH ======================
 /*Given a project name, duplicate the directory*/
-void duplicate_dir(char* project_path, const char* new_project_path);
+void duplicate_dir(char* project_path, const char* new_project_path, Boolean h);
 
 //push:23:projectname:234:blahblahcommintcontent
 void push_commits(char* buffer, int clientSoc);
