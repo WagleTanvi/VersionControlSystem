@@ -1177,10 +1177,9 @@ int main(int argc, char **argv)
         {
             parseBuffer_create(buffer);
             if(strcmp(argv[1], "create") == 0)
-                printf("Successfully created project!\n");
+                printf("[CLIENT] Successfully created project!\n");
             else if(strcmp(argv[1], "checkout") == 0)
-                printf("Successfully checked out project!\n");
-            printf("[CLIENT]  Successfully created project!\n");
+                printf("[CLIENT] Successfully checked out project!\n");
         }
         else
         {
