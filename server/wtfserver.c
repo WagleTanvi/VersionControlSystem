@@ -2,16 +2,17 @@
 #include "header-files/record.h"
 
 /*Create a struct that holds the project name and the mutex. Basically a hashmap that links project name with a mutex.*/
-typedef struct MutexArray
-{
-    char *projectName;
-    pthread_mutex_t mutex;
-} MutexArray;
+// typedef struct MutexArray{
+//     char* projectName;
+//     pthread_mutex_t mutex;
+// } MutexArray;
+
+pthread_mutex_t mutex;
 
 int cmd_count = 0;
 
-MutexArray *array_of_mutexes[5];
-int array_of_mutexes_size = 5;
+// MutexArray* array_of_mutexes[5];
+// int array_of_mutexes_size = 5;
 
 char *extract_path(char *path)
 {
@@ -33,68 +34,55 @@ char *extract_path(char *path)
 }
 
 /*Returns all the projects in the CWD*/
-int find_all_projects()
-{
-    char path[4096];
-    int count = 0;
-    struct dirent *d;
-    DIR *dir = opendir("./");
-    if (dir == NULL)
-    {
-        return 0;
-    }
-    while ((d = readdir(dir)) != NULL)
-    {
-        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, "header-files") == 0)
-            continue;
-        if (d->d_type == DT_DIR)
-        {
-            count++;
-        }
-    }
-    closedir(dir);
-    return count;
-}
+// int find_all_projects(){
+//     char path[4096];
+//     int count = 0;
+//     struct dirent *d;
+//     DIR *dir = opendir("./");
+//     if (dir == NULL){
+//         return 0;
+//     }
+//     while ((d = readdir(dir)) != NULL) {
+//         if(strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, "header-files") == 0) continue;
+//         if (d->d_type == DT_DIR){
+//             count++;
+//         }
+//     }
+//     closedir(dir);
+//     return count;
+// }
 
 /*Returns the names of all the  projects in the CWD as a string array*/
-char **get_project_names(int size)
-{
-    char path[4096];
-    char **project_names = (char **)malloc(size * sizeof(char *));
-    struct dirent *d;
-    DIR *dir = opendir("./");
-    if (dir == NULL)
-    {
-        return NULL;
-    }
-    int i = 0;
-    while ((d = readdir(dir)) != NULL)
-    {
-        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, "header-files") == 0)
-            continue;
-        if (d->d_type == DT_DIR)
-        {
-            project_names[i] = d->d_name;
-            i++;
-        }
-    }
-    closedir(dir);
-    return project_names;
-}
+// char** get_project_names(int size){
+//     char path[4096];
+//     char** project_names = (char**)malloc(size*sizeof(char*));
+//     struct dirent *d;
+//     DIR *dir = opendir("./");
+//     if (dir == NULL){
+//         return NULL;
+//     }
+//     int i = 0;
+//     while ((d = readdir(dir)) != NULL) {
+//         if(strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, "header-files") == 0) continue;
+//         if (d->d_type == DT_DIR){
+//             project_names[i] = d->d_name;
+//             i++;
+//         }
+//     }
+//     closedir(dir);
+//     return project_names;
+// }
 
 /*Returns the corresponding mutex to the project name*/
-pthread_mutex_t find_mutex(char *pname)
-{
-    int i = 0;
-    while (i < array_of_mutexes_size)
-    {
-        if (strcmp(array_of_mutexes[i]->projectName, pname) == 0)
-        {
-            return array_of_mutexes[i]->mutex;
-        }
-        i++;
-    }
-}
+// pthread_mutex_t find_mutex(char* pname){
+//     int i = 0;
+//     while(i < array_of_mutexes_size){
+//         if(strcmp(array_of_mutexes[i]->projectName,pname)==0){
+//             return array_of_mutexes[i]->mutex;
+//         }
+//         i++;
+//     }
+// }
 
 //=============================== HISTORY ======================
 void save_history(char *commitData, char *projectName, char *version)
@@ -267,11 +255,7 @@ void rollback(char *buffer, int clientSoc)
             {
                 found = true;
                 strcpy(new_project_name, d->d_name); //new_project_name = ivyproject-1
-                // break;
-            }
-            else if (version_num > req_version)
-            {
-                int r = rmdir(path);
+                break;
             }
             free(req_dir);
             free(format_str);
@@ -293,12 +277,32 @@ void rollback(char *buffer, int clientSoc)
     duplicate_dir(project_path, new_project_name);
 
     /*Renaming doesn't work for some reason >__<*/
-    char *old_name = (char *)malloc(strlen(project_name) + strlen("-old"));
-    old_name[0] = '\0';
-    strcat(old_name, project_name);
-    strcat(old_name, "-old");
-    int r = rename(project_name, old_name);
-    r = rename(new_project_name, project_name);
+    count = 0;
+    Boolean not_used_name = false;
+    char *old_name = NULL;
+    while (not_used_name != true)
+    {
+        char *number = to_Str(count);
+        char *old_name = (char *)malloc(strlen(project_name) + strlen("-old-") + strlen(number) * sizeof(char));
+        old_name[0] = '\0';
+        strcat(old_name, project_name);
+        strcat(old_name, "-old");
+        strcat(old_name, number);
+        DIR *dir = opendir(old_name);
+        if (dir == NULL)
+        {
+            not_used_name = true;
+            int r = rename(project_name, old_name);
+        }
+        else
+        {
+            free(number);
+            free(old_name);
+        }
+        count++;
+    }
+
+    int r = rename(new_project_name, project_name);
 
     /*Send a success to the client.*/
     block_write(clientSoc, "37:Server has successfully rolled back.\n", 40);
@@ -327,7 +331,7 @@ void duplicate_dir(char *project_path, const char *new_project_path)
     {
         snprintf(path, 4096, "%s/%s", project_path, d->d_name);
         snprintf(newpath, 4096, "%s/%s", new_project_path, d->d_name);
-        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0 || strcmp(d->d_name, "pending-commits") == 0 || strcmp(d->d_name, "history") == 0)
+        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0 || strcmp(d->d_name, "pending-commits") == 0)
             continue;
         if (d->d_type == DT_DIR)
         {
@@ -383,6 +387,8 @@ void expire_pending_commits(char *project_name, char *good_commit)
 //push:23:projectname:234:blahblahcommintcontent
 void push_commits(char *buffer, int clientSoc)
 {
+    pthread_mutex_lock(&mutex);
+
     /*get project name*/
     int bcount = 0;
     char *cmd = strtok(buffer, ":");
@@ -391,10 +397,10 @@ void push_commits(char *buffer, int clientSoc)
     bcount += strlen(plens) + 1;
     int pleni = atoi(plens);
     char *project_name = getSubstring(bcount, buffer, pleni);
+    bcount += (strlen(project_name) + 1);
 
     /*mutex stuff*/
-    pthread_mutex_t m = find_mutex(project_name);
-    pthread_mutex_lock(&m);
+    // pthread_mutex_t m = find_mutex("proj0");
 
     /*check if the project exists in the server*/
     int foundProj = search_proj_exists(project_name);
@@ -406,14 +412,26 @@ void push_commits(char *buffer, int clientSoc)
         return;
     }
 
-    /*Get the commit file data*/
-    bcount += (strlen(project_name) + 1);
+    /*get client host name - to find commit file*/
     int count = bcount;
     while (buffer[count] != ':')
     {
         count++;
     }
     int nlen = count - bcount;
+    char *size_of_hostname = getSubstring(bcount, buffer, nlen);
+    bcount += (strlen(size_of_hostname) + 1);
+    char *hostname = getSubstring(bcount, buffer, atoi(size_of_hostname));
+    bcount += (strlen(hostname) + 1);
+    free(size_of_hostname);
+
+    /*Get the commit file data*/
+    count = bcount;
+    while (buffer[count] != ':')
+    {
+        count++;
+    }
+    nlen = count - bcount;
     char *size = getSubstring(bcount, buffer, nlen);
     bcount += (strlen(size) + 1);
     char *file_content = getSubstring(bcount, buffer, atoi(size));
@@ -421,7 +439,7 @@ void push_commits(char *buffer, int clientSoc)
     //free(size);
 
     /*Get server commit file and compare with the client commit file*/
-    char *hostname = get_host_name();
+    // char *hostname = get_host_name();
     char *pserver = (char *)malloc(strlen(project_name) + strlen(hostname) + strlen("/pending-commits/.Commit-"));
     pserver[0] = '\0';
     strcat(pserver, project_name);
@@ -783,7 +801,7 @@ void push_commits(char *buffer, int clientSoc)
     // freeRecord(client_manifest, 'm', client_manifest_size);
     // freeRecord(active_commit, 'u', active_commit_size);
 
-    pthread_mutex_unlock(&m);
+    pthread_mutex_unlock(&mutex);
 }
 
 //=============================== COMMIT ======================
@@ -819,8 +837,20 @@ void create_commit_file(char *buffer, int clientSoc)
         printf("[SERVER] ERROR set permission error.\n");
     }
 
+    /*Get the client host name*/
+    bcount += (strlen(project_name) + 1);
+    int count = bcount;
+    while (buffer[count] != ':')
+    {
+        count++;
+    }
+    char *size_of_hostname = getSubstring(bcount, buffer, count - bcount);
+    bcount += (strlen(size_of_hostname) + 1);
+    char *hostname = getSubstring(bcount, buffer, atoi(size_of_hostname));
+    bcount += (strlen(hostname) + 1);
+
     /*make commit file*/
-    char *hostname = get_host_name();
+    // char *hostname = get_host_name();
     printf("[SERVER] %s\n", hostname);
     char *pserver = (char *)malloc(strlen(project_name) + strlen(hostname) + strlen("/pending-commits/.Commit-"));
     pserver[0] = '\0';
@@ -838,8 +868,8 @@ void create_commit_file(char *buffer, int clientSoc)
     }
 
     /*write the commit file content to the file*/
-    bcount += (strlen(project_name) + 1);
-    int count = bcount;
+    // bcount += (strlen(project_name) + 1);
+    count = bcount;
     while (buffer[count] != ':')
     {
         count++;
@@ -940,7 +970,7 @@ void fetchServerManifest(char *buffer, int clientSoc)
     if (foundProj == 0)
     {
         free(project_name);
-        block_write(clientSoc, "44:ERROR the project does not exist on server.\n", 40);
+        block_write(clientSoc, "44:ERROR the project does not exist on server.\n", 47);
         return;
     }
 
@@ -987,7 +1017,7 @@ void fetchFile(char *buffer, int clientSoc, char *command)
     int foundFile = fileExists(file_name);
     if (!foundFile)
     {
-        block_write(clientSoc, "40:ERROR the file does not exist on server.\n", 40);
+        block_write(clientSoc, "40:ERROR the file does not exist on server.\n", 43);
         return;
     }
     char *content = getFileContent(file_name, "");
@@ -1074,11 +1104,11 @@ void destroyProject(char *buffer, int clientSoc)
     pserver[0] = '\0';
     strcat(pserver, project_name);
 
-    pthread_mutex_t m = find_mutex(project_name);
-    pthread_mutex_unlock(&m);
-    pthread_mutex_lock(&m);
+    // pthread_mutex_t m = find_mutex(project_name);
+    // pthread_mutex_unlock(&m);
+    pthread_mutex_lock(&mutex);
     int r = remove_directory(pserver);
-    pthread_mutex_unlock(&m);
+    pthread_mutex_unlock(&mutex);
 
     free(project_name);
     free(pserver);
@@ -1097,8 +1127,9 @@ void destroyProject(char *buffer, int clientSoc)
 
 //=============================== CHECKOUT ======================
 /*Increments the global counter- cmd_count*/
-void inc_command_length(char *dirPath, pthread_mutex_t m)
+void inc_command_length(char *dirPath)
 {
+    pthread_mutex_lock(&mutex);
     /*traverse the directory*/
     char path[4096];
     struct dirent *d;
@@ -1110,11 +1141,11 @@ void inc_command_length(char *dirPath, pthread_mutex_t m)
     }
     else
     {
-        pthread_mutex_lock(&m);
+        //pthread_mutex_lock(&m);
         cmd_count += (digits(strlen(dirPath)));
         cmd_count += (strlen(dirPath));
         cmd_count += 4;
-        pthread_mutex_unlock(&m);
+        //pthread_mutex_unlock(&m);
     }
     while ((d = readdir(dir)) != NULL)
     {
@@ -1123,7 +1154,7 @@ void inc_command_length(char *dirPath, pthread_mutex_t m)
             continue;
         if (d->d_type != DT_DIR)
         {
-            pthread_mutex_lock(&m);
+            //pthread_mutex_lock(&m);
             /*for a file*/
             cmd_count += (digits(strlen(path)));
             cmd_count += (strlen(path));
@@ -1134,15 +1165,16 @@ void inc_command_length(char *dirPath, pthread_mutex_t m)
             cmd_count += (digits(strlen(data_client)));
             cmd_count += (strlen(data_client));
             cmd_count += 2;
-            pthread_mutex_unlock(&m);
+            //pthread_mutex_unlock(&m);
             free(data_client);
         }
         else
         {
-            inc_command_length(path, m);
+            inc_command_length(path);
         }
     }
     closedir(dir);
+    pthread_mutex_unlock(&mutex);
 }
 
 /*Returns an char** array that stores all the things to be concatenated together.*/
@@ -1272,6 +1304,19 @@ void createProject(char *buffer, int clientSoc)
         }
         write(manifestFile, "0\n", 2);
         free(pserver);
+
+        char *pserver2 = (char *)malloc(strlen(project_name) + strlen("/.History") + 1);
+        check_malloc_null(pserver2);
+        pserver2[0] = '\0';
+        strcat(pserver2, project_name);
+        strcat(pserver2, "/.History");
+        int historyFile = open(pserver2, O_WRONLY | O_CREAT | O_TRUNC, 0775);
+        if (manifestFile < 0)
+        {
+            block_write(clientSoc, "36:ERROR unable to make history file.\n", 39);
+            return;
+        }
+        free(pserver2);
     }
     else if (strcmp(cmd, "checkout") == 0)
     {
@@ -1284,14 +1329,14 @@ void createProject(char *buffer, int clientSoc)
     }
 
     /*send string to client to make project*/
-    pthread_mutex_t m = find_mutex(project_name);
-    pthread_mutex_unlock(&m);
-    pthread_mutex_lock(&m);
+    // pthread_mutex_t m = find_mutex(project_name);
+    // pthread_mutex_unlock(&m);
+    pthread_mutex_lock(&mutex);
     cmd_count = 0;
     cmd_count += (strlen(cmd) + 1);
-    pthread_mutex_unlock(&m);
+    pthread_mutex_unlock(&mutex);
 
-    inc_command_length(project_name, m);
+    inc_command_length(project_name);
     char *command = (char *)malloc(cmd_count * sizeof(char));
     command[0] = '\0';
     strcat(command, cmd);
@@ -1532,23 +1577,27 @@ void set_up_connection(char *port)
     printf("[SERVER] Server Listening\n");
 
     /*Initialize the mutex array structure*/
-    int num_of_projects = find_all_projects();
-    array_of_mutexes_size = num_of_projects;
-    char **projectNames = get_project_names(num_of_projects);
-    //array_of_mutexes = (MutexArray*)(num_of_projects*sizeof(MutexArray));
-    int i = 0;
-    while (i < num_of_projects)
+    // int num_of_projects = find_all_projects();
+    // array_of_mutexes_size = num_of_projects;
+    // char** projectNames = get_project_names(num_of_projects);
+    // //array_of_mutexes = (MutexArray*)(num_of_projects*sizeof(MutexArray));
+    // int i = 0;
+    // while(i < num_of_projects){
+    //     MutexArray* new_mutex_element = (MutexArray*)malloc(sizeof(MutexArray));
+    //     new_mutex_element->projectName = projectNames[i];
+    //     pthread_mutex_init(&(new_mutex_element->mutex), NULL);
+    //     array_of_mutexes[i] = new_mutex_element;
+    //     i++;
+    // }
+
+    if (pthread_mutex_init(&mutex, NULL) != 0)
     {
-        MutexArray *new_mutex_element = (MutexArray *)malloc(sizeof(MutexArray));
-        new_mutex_element->projectName = projectNames[i];
-        pthread_mutex_init(&(new_mutex_element->mutex), NULL);
-        array_of_mutexes[i] = new_mutex_element;
-        i++;
+        printf("\n mutex init has failed\n");
     }
 
     /*For every client that connects - throw it into a new thread*/
     pthread_t tid[10];
-    i = 0;
+    int i = 0;
     while (1)
     {
         /*Handing SIGINT*/
@@ -1582,6 +1631,7 @@ void set_up_connection(char *port)
     {
         pthread_join(tid[i], NULL);
     }
+    pthread_mutex_destroy(&mutex);
 
     /*Free and destroy the mutex array structure*/
     // i = 0;

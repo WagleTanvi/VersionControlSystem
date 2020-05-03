@@ -15,6 +15,8 @@
 #include <netdb.h>
 #include <libgen.h>
 #include <openssl/sha.h>
+#include <netinet/in.h> 
+#include <arpa/inet.h>
 
 typedef struct Record{
     char* version; //for manifest it is the version number, for upgrade and push it is the command 'M','A', or 'D'

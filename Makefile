@@ -19,7 +19,7 @@ WTFServer: ./server/wtfserver.c ./server/header-files/record.o ./server/header-f
 	gcc -c ./server/header-files/helper.c -o ./server/header-files/helper.o
 
 clean:
-	rm ./client/WTF ./client/header-files/record.o ./client/header-files/helper.o ./server/header-files/record.o ./server/header-files/helper.o ./server/WTFServer
+	rm ./client/WTF ./client/header-files/record.o ./client/header-files/helper.o ./server/header-files/record.o ./server/header-files/helper.o ./server/WTFServer WTFTest
 
 gdbserver:
 	gdb ./WTFServer
@@ -30,6 +30,6 @@ gdbclient:
 runserver:
 	./WTFServer 8006
 
-WTFTest:
+WTFTest: WTF WTFServer test.c
 	gcc -g test.c -o WTFTest
 
