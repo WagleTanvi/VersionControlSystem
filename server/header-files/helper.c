@@ -154,55 +154,55 @@ int number_of_lines(char *fileData)
     return count;
 }
 
-// Returns hostname for the local computer 
-void checkHostName(int hostname) 
-{ 
-    if (hostname == -1) 
-    { 
-        perror("gethostname"); 
-    } 
-}
+// // Returns hostname for the local computer 
+// void checkHostName(int hostname) 
+// { 
+//     if (hostname == -1) 
+//     { 
+//         perror("gethostname"); 
+//     } 
+// }
 
-// Returns host information corresponding to host name 
-void checkHostEntry(struct hostent * hostentry) 
-{ 
-    if (hostentry == NULL) 
-    { 
-        perror("gethostbyname"); 
-    } 
-} 
+// // Returns host information corresponding to host name 
+// void checkHostEntry(struct hostent * hostentry) 
+// { 
+//     if (hostentry == NULL) 
+//     { 
+//         perror("gethostbyname"); 
+//     } 
+// } 
   
-// Converts space-delimited IPv4 addresses 
-// to dotted-decimal format 
-void checkIPbuffer(char *IPbuffer) 
-{ 
-    if (NULL == IPbuffer) 
-    { 
-        perror("inet_ntoa"); 
-    } 
-} 
+// // Converts space-delimited IPv4 addresses 
+// // to dotted-decimal format 
+// void checkIPbuffer(char *IPbuffer) 
+// { 
+//     if (NULL == IPbuffer) 
+//     { 
+//         perror("inet_ntoa"); 
+//     } 
+// } 
   
-/*Returns the IP address of a machine!*/ 
-char* get_host_name()
-{ 
-    char* hostbuffer = (char*)malloc(256*sizeof(char)); 
-    char *IPbuffer; 
-    struct hostent *host_entry; 
-    int hostname; 
+// /*Returns the IP address of a machine!*/ 
+// char* get_host_name()
+// { 
+//     char hostbuffer[256]; 
+//     char *IPbuffer; 
+//     struct hostent *host_entry; 
+//     int hostname; 
   
-    // To retrieve hostname 
-    hostname = gethostname(hostbuffer, sizeof(hostbuffer)); 
-    checkHostName(hostname); 
+//     // To retrieve hostname 
+//     hostname = gethostname(hostbuffer, sizeof(hostbuffer)); 
+//     checkHostName(hostname); 
 
-    // To retrieve host information 
-    host_entry = gethostbyname(hostbuffer); 
-    checkHostEntry(host_entry); 
+//     // To retrieve host information 
+//     host_entry = gethostbyname(hostbuffer); 
+//     checkHostEntry(host_entry); 
   
-    // To convert an Internet network address into ASCII string 
-    IPbuffer = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0])); 
+//     // To convert an Internet network address into ASCII string 
+//     IPbuffer = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0])); 
   
-    return hostbuffer; 
-} 
+//     return IPbuffer; 
+// } 
 
 char *fetch_file_from_client(char *fileName, int clientSoc)
 {

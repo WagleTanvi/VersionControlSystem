@@ -1,6 +1,57 @@
 #include "header-files/helper.h"
 #include "header-files/record.h"
 
+
+// Returns hostname for the local computer 
+void checkHostName(int hostname) 
+{ 
+    if (hostname == -1) 
+    { 
+        perror("gethostname"); 
+    } 
+}
+
+// Returns host information corresponding to host name 
+void checkHostEntry(struct hostent * hostentry) 
+{ 
+    if (hostentry == NULL) 
+    { 
+        perror("gethostbyname"); 
+    } 
+} 
+  
+// Converts space-delimited IPv4 addresses 
+// to dotted-decimal format 
+void checkIPbuffer(char *IPbuffer) 
+{ 
+    if (NULL == IPbuffer) 
+    { 
+        perror("inet_ntoa"); 
+    } 
+} 
+  
+/*Returns the IP address of a machine!*/ 
+char* get_host_name()
+{ 
+    char hostbuffer[256]; 
+    char *IPbuffer; 
+    struct hostent *host_entry; 
+    int hostname; 
+  
+    // To retrieve hostname 
+    hostname = gethostname(hostbuffer, sizeof(hostbuffer)); 
+    checkHostName(hostname); 
+
+    // To retrieve host information 
+    host_entry = gethostbyname(hostbuffer); 
+    checkHostEntry(host_entry); 
+  
+    // To convert an Internet network address into ASCII string 
+    IPbuffer = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0])); 
+  
+    return IPbuffer; 
+}
+
 void syncManifests(char *project_name, char *buffer)
 {
     char *manifest = (char *)malloc(strlen(project_name) + strlen("./Manifest") * sizeof(char));
@@ -61,6 +112,14 @@ void remove_commit_file(int sockfd, char *project_name)
 /*Sends the commit file to the server.*/
 char* write_commit_file(int sockfd, char *project_name, char *server_record_data)
 {
+    /*check if the project exists in the server*/
+    Boolean foundProj = searchForProject(project_name);
+    if (foundProj == false)
+    {
+        printf("ERROR project does not exist.\n");
+        return "error";
+    }
+
     //first check if the client has updates to be made
     char *pclient = (char *)malloc(strlen(project_name) + strlen("./Update") * sizeof(char));
     pclient[0] = '\0';
@@ -1084,7 +1143,10 @@ int main(int argc, char **argv)
         if (strstr(buffer, "create") != NULL || strstr(buffer, "checkout") != NULL)
         {
             parseBuffer_create(buffer);
-            printf("Successfully created project!\n");
+            if(strcmp(argv[1], "create") == 0)
+                printf("Successfully created project!\n");
+            else if(strcmp(argv[1], "checkout") == 0)
+                printf("Successfully checked out project!\n");
         }
         else
         {
@@ -1178,9 +1240,7 @@ int main(int argc, char **argv)
         char *buffer = read_from_server(sockfd);
         char* s = write_commit_file(sockfd, argv[2], buffer);
 
-        /*Send the commit file to the server
-            34:commit:23:projectname:234:commitdata
-        */
+        /*if the commit  had no changes then just stop there - or if there was an error*/
         if(strcmp(s, "error") == 0){
             /*disconnect*/
             block_write(sockfd, "4:Done", 6);
@@ -1188,6 +1248,7 @@ int main(int argc, char **argv)
             close(sockfd);
             return;
         }
+
         char *commit_file = (char *)malloc(strlen(argv[2]) + strlen("/.Commit"));
         commit_file[0] = '\0';
         strcat(commit_file, argv[2]);
@@ -1198,12 +1259,19 @@ int main(int argc, char **argv)
             block_write(sockfd, "4:Done", 6);
             printf("Client Disconnecting\n");
             close(sockfd);   
+            return;
         }
         char *length_of_commit = to_Str(strlen(commit_file_content));
+        char* hostname = get_host_name();
+        char* hostname_len = to_Str(strlen(hostname));
 
-        char *send_commit_to_server = (char *)malloc(strlen(argv[2]) + strlen(length_of_commit) + strlen(commit_file_content) * sizeof(char));
+        char *send_commit_to_server = (char *)malloc(strlen(argv[2]) + 1+ strlen(hostname_len) + 1 + strlen(hostname) + 1+ strlen(length_of_commit) + 1 + strlen(commit_file_content) * sizeof(char));
         send_commit_to_server[0] = '\0';
         strcat(send_commit_to_server, argv[2]);
+        strcat(send_commit_to_server, ":");
+        strcat(send_commit_to_server, hostname_len);
+        strcat(send_commit_to_server, ":");
+        strcat(send_commit_to_server, hostname);
         strcat(send_commit_to_server, ":");
         strcat(send_commit_to_server, length_of_commit);
         strcat(send_commit_to_server, ":");
@@ -1220,6 +1288,10 @@ int main(int argc, char **argv)
     }
     else if (argc == 3 && (strcmp(argv[1], "push") == 0))
     {
+        /*Get client hostname*/
+        char* hostname = get_host_name();
+        char* hostname_len = to_Str(strlen(hostname));  
+
         /*Get the data from the commit file*/
         sockfd = read_configure_and_connect();
         char *commit_file = (char *)malloc(strlen(argv[2]) + strlen("/.Commit"));
@@ -1257,9 +1329,13 @@ int main(int argc, char **argv)
         }
 
         /*attach everything*/
-        char *sec_cmd = (char *)malloc(strlen(argv[2]) + 1 + digits(strlen(commitfile_content)) + 1 + strlen(commitfile_content) + 1 + digits(strlen(manifest_file_content)) + 1 + strlen(manifest_file_content));
+        char *sec_cmd = (char *)malloc(strlen(argv[2]) + 1 + strlen(hostname_len) + 1 + strlen(hostname) + 1 + digits(strlen(commitfile_content)) + 1 + strlen(commitfile_content) + 1 + digits(strlen(manifest_file_content)) + 1 + strlen(manifest_file_content));
         sec_cmd[0] = '\0';
         strcat(sec_cmd, argv[2]);
+        strcat(sec_cmd, ":");
+        strcat(sec_cmd, hostname_len);
+        strcat(sec_cmd, ":");
+        strcat(sec_cmd, hostname);
         strcat(sec_cmd, ":");
         strcat(sec_cmd, to_Str(strlen(commitfile_content)));
         strcat(sec_cmd, ":");
@@ -1309,13 +1385,6 @@ int main(int argc, char **argv)
         write_to_server(sockfd, "rollback", sec_cmd, argv[2]);
         char *buffer = read_from_server(sockfd);
         printf("%s\n", buffer);
-
-        char *old_name = (char *)malloc(strlen(argv[2]) + strlen("-old"));
-        old_name[0] = '\0';
-        strcat(old_name, argv[2]);
-        strcat(old_name, "-old");
-        write_to_server(sockfd, "destroy", old_name, old_name);
-        buffer = read_from_server(sockfd);
 
         /*disconnect server at the end!*/
         block_write(sockfd, "4:Done", 6);

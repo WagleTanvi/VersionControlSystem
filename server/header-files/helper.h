@@ -113,7 +113,7 @@ void destroyProject(char *buffer, int clientSoc);
 
 //=============================== CHECKOUT ======================
 /*Increments the global counter- cmd_count*/
-void inc_command_length(char* dirPath, pthread_mutex_t m);
+void inc_command_length(char* dirPath);
 
 /*Returns an char** array that stores all the things to be concatenated together.*/
 char *checkoutProject(char *command, char *dirPath, int clientSoc);
