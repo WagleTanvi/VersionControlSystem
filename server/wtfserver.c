@@ -947,7 +947,7 @@ void fetchServerManifest(char *buffer, int clientSoc)
     if (foundProj == 0)
     {
         free(project_name);
-        block_write(clientSoc, "44:ERROR the project does not exist on server.\n", 40);
+        block_write(clientSoc, "44:ERROR the project does not exist on server.\n", 47);
         return;
     }
 
@@ -991,7 +991,7 @@ void fetchFile(char *buffer, int clientSoc, char *command)
     int foundFile = fileExists(file_name);
     if (!foundFile)
     {
-        block_write(clientSoc, "40:ERROR the file does not exist on server.\n", 40);
+        block_write(clientSoc, "40:ERROR the file does not exist on server.\n", 43);
         return;
     }
     char *content = getFileContent(file_name, "");

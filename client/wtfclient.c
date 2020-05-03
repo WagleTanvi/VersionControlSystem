@@ -319,7 +319,7 @@ char *fetch_file_from_server(char *fileName, int sockfd)
     strcat(command, digLenFilePathChar);
     strcat(command, ":");
     strcat(command, fileName);
-    printf("Sending Message to Server: %s\n", command);
+    //printf("Sending Message to Server: %s\n", command);
     block_write(sockfd, command, totalLen);
     int messageLen = read_len_message(sockfd);
     //printf("Receieved from Server a message of length: %d\n", messageLen);
@@ -940,8 +940,11 @@ void get_history_file(char *projectName, int sockfd)
     if (newContent == NULL)
     {
         return;
+    } else if(strcmp(newContent, "")==0){
+        printf("History file is empty.\n");
+    } else {
+        printf("History for %s:\n%s\n", projectName, newContent);
     }
-    printf("History for %s:\n%s\n", projectName, newContent);
 }
 //=========================== SOCKET/CONFIGURE METHODS==================================================================
 /* delay function - DOESNT really WORK*/
@@ -1137,10 +1140,22 @@ int main(int argc, char **argv)
     else if (argc == 3 && (strcmp(argv[1], "create") == 0 || strcmp(argv[1], "checkout") == 0))
     {
         sockfd = read_configure_and_connect();
-        write_to_server(sockfd, argv[1], argv[2], argv[2]);
+
+        /*first check if the project already exists on the client*/
+        Boolean found_proj = searchForProject(argv[2]);
+        if(found_proj == true){
+            printf("ERROR the project already exists on the client!\n");
+            /*disconnect server at the end!*/
+            block_write(sockfd, "4:Done", 6);
+            printf("\nClient Disconnecting.\n");
+            close(sockfd);
+            return;
+        }
+
+        write_to_server(sockfd, argv[1], argv[2], argv[2]);        
 
         char *buffer = read_from_server(sockfd);
-        if (strstr(buffer, "create") != NULL || strstr(buffer, "checkout") != NULL)
+        if (strstr(buffer, "ERROR") == NULL)
         {
             parseBuffer_create(buffer);
             if(strcmp(argv[1], "create") == 0)
@@ -1244,7 +1259,7 @@ int main(int argc, char **argv)
         if(strcmp(s, "error") == 0){
             /*disconnect*/
             block_write(sockfd, "4:Done", 6);
-            printf("Client Disconnecting\n");
+            printf("\nClient Disconnecting\n");
             close(sockfd);
             return;
         }
@@ -1257,7 +1272,7 @@ int main(int argc, char **argv)
         if(commit_file_content == NULL){
             /*disconnect*/
             block_write(sockfd, "4:Done", 6);
-            printf("Client Disconnecting\n");
+            printf("\nClient Disconnecting\n");
             close(sockfd);   
             return;
         }
@@ -1305,7 +1320,7 @@ int main(int argc, char **argv)
             /*disconnect*/
             free(commit_file);
             block_write(sockfd, "4:Done", 6);
-            printf("Client Disconnecting\n");
+            printf("\nClient Disconnecting\n");
             close(sockfd);
             return;
         }
@@ -1323,7 +1338,7 @@ int main(int argc, char **argv)
             free(commit_file);
             free(manifest_file);
             block_write(sockfd, "4:Done", 6);
-            printf("Client Disconnecting\n");
+            printf("\nClient Disconnecting\n");
             close(sockfd);
             return;
         }
@@ -1410,7 +1425,7 @@ int main(int argc, char **argv)
 
         /*disconnect*/
         block_write(sockfd, "4:Done", 6);
-        printf("Client Disconnecting\n");
+        printf("\nClient Disconnecting\n");
         close(sockfd);
     }
     else
