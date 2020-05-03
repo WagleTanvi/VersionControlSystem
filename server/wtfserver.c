@@ -274,7 +274,7 @@ void rollback(char *buffer, int clientSoc)
     strcat(project_path, project_name);
     strcat(project_path, "/history/\0");
     strcat(project_path, new_project_name);
-    duplicate_dir(project_path, new_project_name);
+    duplicate_dir(project_path, new_project_name, false);
 
     /*Renaming doesn't work for some reason >__<*/
     count = 0;
@@ -315,8 +315,12 @@ void rollback(char *buffer, int clientSoc)
 //=============================== PUSH ======================
 
 /*Given a project name, duplicate the directory*/
-void duplicate_dir(char *project_path, const char *new_project_path)
+void duplicate_dir(char *project_path, const char *new_project_path, Boolean history)
 {
+    if (history == true)
+    {
+        return;
+    }
     char path[4096];
     char newpath[4096];
     struct dirent *d;
@@ -333,9 +337,13 @@ void duplicate_dir(char *project_path, const char *new_project_path)
         snprintf(newpath, 4096, "%s/%s", new_project_path, d->d_name);
         if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0 || strcmp(d->d_name, "pending-commits") == 0)
             continue;
+        else if (strcmp(d->d_name, "history") == 0)
+        {
+            history = true;
+        }
         if (d->d_type == DT_DIR)
         {
-            duplicate_dir(path, newpath);
+            duplicate_dir(path, newpath, history);
         }
         else
         {
@@ -547,7 +555,7 @@ void push_commits(char *buffer, int clientSoc)
     strcat(new_project_path, project_name);
     strcat(new_project_path, "/history/");
     strcat(new_project_path, new_project_name);
-    duplicate_dir(project_name, new_project_path);
+    duplicate_dir(project_name, new_project_path, false);
     // free(v_len);
     // free(new_project_name);
     // free(new_project_path);
@@ -850,7 +858,6 @@ void create_commit_file(char *buffer, int clientSoc)
     bcount += (strlen(hostname) + 1);
 
     /*make commit file*/
-    // char *hostname = get_host_name();
     printf("[SERVER] %s\n", hostname);
     char *pserver = (char *)malloc(strlen(project_name) + strlen(hostname) + strlen("/pending-commits/.Commit-"));
     pserver[0] = '\0';
@@ -1141,11 +1148,9 @@ void inc_command_length(char *dirPath)
     }
     else
     {
-        //pthread_mutex_lock(&m);
         cmd_count += (digits(strlen(dirPath)));
         cmd_count += (strlen(dirPath));
         cmd_count += 4;
-        //pthread_mutex_unlock(&m);
     }
     while ((d = readdir(dir)) != NULL)
     {
@@ -1154,7 +1159,6 @@ void inc_command_length(char *dirPath)
             continue;
         if (d->d_type != DT_DIR)
         {
-            //pthread_mutex_lock(&m);
             /*for a file*/
             cmd_count += (digits(strlen(path)));
             cmd_count += (strlen(path));
@@ -1165,7 +1169,6 @@ void inc_command_length(char *dirPath)
             cmd_count += (digits(strlen(data_client)));
             cmd_count += (strlen(data_client));
             cmd_count += 2;
-            //pthread_mutex_unlock(&m);
             free(data_client);
         }
         else

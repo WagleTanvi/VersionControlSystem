@@ -278,7 +278,7 @@ char *write_commit_file(int sockfd, char *project_name, char *server_record_data
                     printf("[CLIENT] %s ", "D ");
                     write(commit_fd, " ", 1);
                     write(commit_fd, file_name, strlen(file_name));
-                    printf("[CLIENT] %s\n", file_name);
+                    printf("%s\n", file_name);
                     write(commit_fd, " ", 1);
                     write(commit_fd, server_manifest[i]->hash, strlen(server_manifest[i]->hash));
                     write(commit_fd, "\n", 1);
@@ -291,7 +291,7 @@ char *write_commit_file(int sockfd, char *project_name, char *server_record_data
                 printf("[CLIENT] %s ", "D ");
                 write(commit_fd, " ", 1);
                 write(commit_fd, file_name, strlen(file_name));
-                printf("[CLIENT] %s\n", file_name);
+                printf("%s\n", file_name);
                 write(commit_fd, " ", 1);
                 write(commit_fd, server_manifest[i]->hash, strlen(server_manifest[i]->hash));
                 write(commit_fd, "\n", 1);
@@ -329,7 +329,7 @@ char *fetch_file_from_server(char *fileName, int sockfd)
     strcat(command, digLenFilePathChar);
     strcat(command, ":");
     strcat(command, fileName);
-    //printf("[CLIENT] Sending Message to Server: %s\n", command);
+    printf("[CLIENT] Sending Message to Server: %s\n", command);
     block_write(sockfd, command, totalLen);
     int messageLen = read_len_message(sockfd);
     //printf("[CLIENT] Receieved from Server a message of length: %d\n", messageLen);
@@ -474,7 +474,7 @@ void upgrade(char *projectName, int sockfd)
         Record **serverRecords = create_record_struct(serverContent, true);
         Record **manifestClient = create_record_struct(fileData, true);
         int adds = find_number_of_adds(updateRecords);
-        printf("[CLIENT] Number of Adds %d\n", adds);
+        //printf("[CLIENT] Number of Adds %d\n", adds);
         Record **addRecords = (Record **)malloc(sizeof(Record *) * adds);
         int countAdd = 0;
         //printAllRecords(updateRecords);
@@ -564,7 +564,7 @@ void upgrade(char *projectName, int sockfd)
             }
             x++;
         }
-        printf("[CLIENT] Add Count %d\n", countAdd);
+        //printf("[CLIENT] Add Count %d\n", countAdd);
         //printAllRecords(manifestClient);
         int fd = open(manifestFilePath, O_WRONLY | O_TRUNC);
         if (fd == -1)
@@ -593,7 +593,8 @@ void upgrade(char *projectName, int sockfd)
         unlink(tempServerFilePath);
         free(updateFilePath);
         free(conflictFilePath);
-        printAllRecords(updateRecords);
+        printf("[CLIENT] Successfully Upgraded!\n");
+        //printAllRecords(updateRecords);
         //freeRecord(updateRecords, 'u', getRecordStructSize(updateRecords));
         freeRecord(manifestClient, 'm', getRecordStructSize(manifestClient));
         freeRecord(serverRecords, 'm', getRecordStructSize(serverRecords));
@@ -965,7 +966,7 @@ void get_history_file(char *projectName, int sockfd)
     {
         printf("History for %s:\n%s\n", projectName, newContent);
     }
-    // printf("[CLIENT] History for %s:\n%s\n", projectName, newContent);
+    printf("[CLIENT] History for %s:\n%s\n", projectName, newContent);
 }
 //=========================== SOCKET/CONFIGURE METHODS==================================================================
 /* delay function - DOESNT really WORK*/
@@ -1166,10 +1167,10 @@ int main(int argc, char **argv)
         Boolean found_proj = searchForProject(argv[2]);
         if (found_proj == true)
         {
-            printf("ERROR the project already exists on the client!\n");
+            printf("[CLIENT] ERROR the project already exists on the client!\n");
             /*disconnect server at the end!*/
             block_write(sockfd, "4:Done", 6);
-            printf("\nClient Disconnecting.\n");
+            printf("[CLIENT] Client Disconnecting.\n");
             close(sockfd);
             return;
         }
@@ -1191,7 +1192,7 @@ int main(int argc, char **argv)
         }
         /*disconnect server at the end!*/
         block_write(sockfd, "4:Done", 6);
-        printf("[CLIENT]  Client Disconnecting.\n");
+        printf("[CLIENT] Client Disconnecting.\n");
         close(sockfd);
     }
     else if (argc == 3 && (strcmp(argv[1], "destroy") == 0))
@@ -1203,7 +1204,7 @@ int main(int argc, char **argv)
 
         /*disconnect server at the end!*/
         block_write(sockfd, "4:Done", 6);
-        printf("[CLIENT]  Client Disconnecting.\n");
+        printf("[CLIENT] Client Disconnecting.\n");
         close(sockfd);
     }
     else if (argc == 4 && (strcmp(argv[1], "add") == 0 || strcmp(argv[1], "remove") == 0))
@@ -1260,7 +1261,7 @@ int main(int argc, char **argv)
         update(argv[2], sockfd);
 
         block_write(sockfd, "4:Done", 6);
-        printf("[CLIENT]  Client Disconnecting\n");
+        printf("[CLIENT] Client Disconnecting\n");
         close(sockfd);
     }
     else if (argc == 3 && (strcmp(argv[1], "upgrade") == 0))
@@ -1286,7 +1287,7 @@ int main(int argc, char **argv)
         {
             /*disconnect*/
             block_write(sockfd, "4:Done", 6);
-            printf("\n[CLIENT] Client Disconnecting\n");
+            printf("\nClient Disconnecting\n");
             close(sockfd);
             return;
         }
@@ -1302,7 +1303,6 @@ int main(int argc, char **argv)
             block_write(sockfd, "4:Done", 6);
             printf("[CLIENT] Client Disconnecting\n");
             close(sockfd);
-            return;
         }
         char *length_of_commit = to_Str(strlen(commit_file_content));
         char *hostname = get_host_name();
