@@ -1,0 +1,41 @@
+cd server
+./WTFServer 9008 &
+echo '=============================================='
+echo 'RUNNING SEQUENCE 2'
+rm -rf proj0
+cd ../client
+rm -rf proj0
+echo '=============================================='
+echo 'Running update proj0'
+echo 'Expected output: proj does not exist'
+./WTF update proj0
+echo '=============================================='
+echo 'Running upgrade proj0'
+echo 'Expected output: proj does not exist'
+./WTF upgrade proj0
+echo '=============================================='
+echo 'Running Create proj0'
+echo 'Expected output: Success'
+./WTF create proj0
+echo '=============================================='
+echo 'Running upgrade proj0'
+echo 'Expected output: .Update file does not exist'
+./WTF upgrade proj0
+echo '=============================================='
+touch proj0/file.txt
+echo test > proj0/file.txt
+echo 'Running add proj0 file.txt'
+echo 'Expected output: Success'
+./WTF add proj0 file.txt
+echo '=============================================='
+echo 'Running commit proj0'
+echo 'Expected output: Add file.txt'
+./WTF commit proj0
+echo '=============================================='
+echo 'Running push proj0'
+echo 'Expected output: No commits for push'
+./WTF push proj0
+echo '=============================================='
+echo 'Killing Server Proccess'
+pkill WTFServer
+echo 'Tests Completed'

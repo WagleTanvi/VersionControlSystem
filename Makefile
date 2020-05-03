@@ -29,3 +29,7 @@ gdbclient:
 
 runserver:
 	./WTFServer 8006
+
+WTFTest:
+	gcc -g test.c -o WTFTest
+

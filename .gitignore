@@ -7,3 +7,4 @@ server/t
 .nfs*
 server/.nfs*
 client/.nfs*
+WTFTest
