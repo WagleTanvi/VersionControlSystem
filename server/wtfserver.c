@@ -28,7 +28,7 @@ char *extract_path(char *path)
     char *temp = (char *)malloc(sizeof(char) * x + 2);
     strncpy(temp, path, x + 1);
     temp[x + 1] = '\0';
-    //printf("%s\n", temp);
+    //printf("[SERVER] %s\n", temp);
     return temp;
 }
 
@@ -106,7 +106,7 @@ void save_history(char *commitData, char *projectName, char *version)
     int fd = open(filePath, O_WRONLY | O_CREAT | O_APPEND, 00600);
     if (fd == -1)
     {
-        printf("Fatal Error: Could not open History file");
+        printf("[SERVER] Fatal Error: Could not open History file");
         return;
     }
     //write(fd, "Project version: ", strlen("Project version: "));
@@ -230,8 +230,8 @@ void rollback(char *buffer, int clientSoc)
         count++;
     }
     //count = 18
-    int nlen = count-bcount; //1
-    bcount = (count+1);
+    int nlen = count - bcount; //1
+    bcount = (count + 1);
     int req_version = atoi(getSubstring(bcount, buffer, nlen));
 
     /*Traverse history folder - if the version number is greater then the requested then delete that version*/
@@ -319,7 +319,7 @@ void duplicate_dir(char *project_path, const char *new_project_path)
     DIR *dir = opendir(project_path);
     if (dir == NULL)
     {
-        printf("ERROR this is not a directory.\n");
+        printf("[SERVER] ERROR this is not a directory.\n");
         return;
     }
     mkdir_recursive(new_project_path);
@@ -338,7 +338,7 @@ void duplicate_dir(char *project_path, const char *new_project_path)
             int dup_file = open(newpath, O_WRONLY | O_CREAT | O_TRUNC, 0775);
             if (dup_file < 0)
             {
-                printf("ERROR unable to make new file: %s\n", strerror(errno));
+                printf("[SERVER] ERROR unable to make new file: %s\n", strerror(errno));
             }
             char *old_file_contents = getFileContent(path, "");
             write(dup_file, old_file_contents, strlen(old_file_contents));
@@ -360,7 +360,7 @@ void expire_pending_commits(char *project_name, char *good_commit)
     DIR *dir = opendir(pserver);
     if (dir == NULL)
     {
-        printf("ERROR this is not a directory.\n");
+        printf("[SERVER] ERROR this is not a directory.\n");
         return;
     }
     while ((d = readdir(dir)) != NULL)
@@ -445,11 +445,11 @@ void push_commits(char *buffer, int clientSoc)
     {
         if (strcmp(server_file_content, "") == 0)
         {
-            printf("ERROR the server commit file is empty.\n");
+            printf("[SERVER] ERROR the server commit file is empty.\n");
         }
         else
         {
-            printf("ERROR the client and sever commit files do not match.\n");
+            printf("[SERVER] ERROR the client and sever commit files do not match.\n");
         }
         expire_pending_commits(project_name, "");
         // free(project_name);
@@ -512,7 +512,7 @@ void push_commits(char *buffer, int clientSoc)
     mkdir_recursive(history_dir);
     int ch = chmod(history_dir, 0775);
     if (ch < 0)
-        printf("ERROR set permission error.\n");
+        printf("[SERVER] ERROR set permission error.\n");
     // free(history_dir);
 
     /*move old project to the history folder*/
@@ -564,7 +564,7 @@ void push_commits(char *buffer, int clientSoc)
                 // freeRecord(server_manifest, 'm', server_manifest_size);
                 // freeRecord(client_manifest, 'm', client_manifest_size);
                 // freeRecord(active_commit, 'u', active_commit_size);
-                printf("ERROR could not find the file in the manifest. Update?\n");
+                printf("[SERVER] ERROR could not find the file in the manifest. Update?\n");
                 block_write(clientSoc, "21:Push command failed 3!\n", 24);
                 return;
             }
@@ -573,7 +573,7 @@ void push_commits(char *buffer, int clientSoc)
             if (newContent == NULL)
             {
                 expire_pending_commits(project_name, "");
-                printf("Fatal Error: Could not find the path %s in the client.\n", filepath);
+                printf("[SERVER] Fatal Error: Could not find the path %s in the client.\n", filepath);
                 // free(project_name);
                 // free(file_content);
                 // free(pserver);
@@ -591,7 +591,7 @@ void push_commits(char *buffer, int clientSoc)
             if (fd == -1)
             {
                 expire_pending_commits(project_name, "");
-                printf("Fatal Error: Could not open Update file");
+                printf("[SERVER] Fatal Error: Could not open Update file");
                 // free(project_name);
                 // free(file_content);
                 // free(pserver);
@@ -631,7 +631,7 @@ void push_commits(char *buffer, int clientSoc)
             if (new_file < 0)
             {
                 expire_pending_commits(project_name, "");
-                printf("ERROR unable to make new file: %s\n", strerror(errno));
+                printf("[SERVER] ERROR unable to make new file: %s\n", strerror(errno));
                 // free(project_name);
                 // free(file_content);
                 // free(pserver);
@@ -649,7 +649,7 @@ void push_commits(char *buffer, int clientSoc)
             if (manifest_rec != NULL)
             {
                 expire_pending_commits(project_name, "");
-                printf("ERROR already exists in manifest.\n");
+                printf("[SERVER] ERROR already exists in manifest.\n");
                 // free(project_name);
                 // free(file_content);
                 // free(pserver);
@@ -682,7 +682,7 @@ void push_commits(char *buffer, int clientSoc)
             if (newContent == NULL)
             {
                 expire_pending_commits(project_name, "");
-                printf("Fatal Error: Could not find the path %s in the client.\n", filepath);
+                printf("[SERVER] Fatal Error: Could not find the path %s in the client.\n", filepath);
                 // free(project_name);
                 // free(file_content);
                 // free(pserver);
@@ -701,7 +701,7 @@ void push_commits(char *buffer, int clientSoc)
             if (fd == -1)
             {
                 expire_pending_commits(project_name, "");
-                printf("Fatal Error: Could not open Update file");
+                printf("[SERVER] Fatal Error: Could not open Update file");
                 block_write(clientSoc, "21:Push command failed 9!\n", 24);
                 return;
             }
@@ -731,7 +731,7 @@ void push_commits(char *buffer, int clientSoc)
         }
         else
         {
-            printf("ERROR action not implemented.\n");
+            printf("[SERVER] ERROR action not implemented.\n");
             block_write(clientSoc, "21:Push command failed 10!\n", 24);
         }
         x++;
@@ -816,12 +816,12 @@ void create_commit_file(char *buffer, int clientSoc)
     int ch = chmod(pending_commits, 0775);
     if (ch < 0)
     {
-        printf("ERROR set permission error.\n");
+        printf("[SERVER] ERROR set permission error.\n");
     }
 
     /*make commit file*/
     char *hostname = get_host_name();
-    printf("%s\n", hostname);
+    printf("[SERVER] %s\n", hostname);
     char *pserver = (char *)malloc(strlen(project_name) + strlen(hostname) + strlen("/pending-commits/.Commit-"));
     pserver[0] = '\0';
     strcat(pserver, project_name);
@@ -868,7 +868,7 @@ void create_commit_file(char *buffer, int clientSoc)
 /*Sends the contents of the manifest to the client.*/
 int send_manifest(char *project_name, int clientSoc)
 {
-    //printf("Sending Manifest to client\n");
+    //printf("[SERVER] Sending Manifest to client\n");
     char path[4096];
     struct dirent *d;
     DIR *dir = opendir(project_name);
@@ -891,7 +891,7 @@ int send_manifest(char *project_name, int clientSoc)
             {
                 /*add the length of the full commmand to the front of the protocol*/
                 char *manifest_data = getFileContent(path, "");
-                //printf("%s\n", manifest_data);
+                //printf("[SERVER] %s\n", manifest_data);
                 int m_len = strlen(manifest_data);
                 char *m_len_str = to_Str(m_len);
                 char *new_mdata = (char *)malloc(m_len + strlen(m_len_str) + 2 * sizeof(char));
@@ -899,7 +899,7 @@ int send_manifest(char *project_name, int clientSoc)
                 strcat(new_mdata, m_len_str);
                 strcat(new_mdata, ":");
                 strcat(new_mdata, manifest_data);
-                //printf("%s\n", new_mdata);
+                //printf("[SERVER] %s\n", new_mdata);
                 /*write to the client*/
                 int n = write(clientSoc, new_mdata, strlen(new_mdata));
                 free(m_len_str);
@@ -907,7 +907,7 @@ int send_manifest(char *project_name, int clientSoc)
                 free(new_mdata);
                 if (n < 0)
                 {
-                    printf("ERROR writing to client.\n");
+                    printf("[SERVER] ERROR writing to client.\n");
                     closedir(dir);
                     return -1;
                 }
@@ -950,11 +950,11 @@ void fetchServerManifest(char *buffer, int clientSoc)
     /*More error checking*/
     if (s == -1)
     {
-        printf("ERROR sending Manifest to client./\n");
+        printf("[SERVER] ERROR sending Manifest to client./\n");
     }
     else if (s == -2)
     {
-        printf("ERROR cannot find Manifest file./\n");
+        printf("[SERVER] ERROR cannot find Manifest file./\n");
     }
     free(project_name);
 }
@@ -971,7 +971,7 @@ Boolean fileExists(char *fileName)
     int fd = open(fileName, O_RDONLY);
     if (fd == -1)
     {
-        //printf("Fatal Error: %s named %s\n", strerror(errno), file);
+        //printf("[SERVER] Fatal Error: %s named %s\n", strerror(errno), file);
         //close(fd);
         return false;
     }
@@ -983,7 +983,7 @@ void fetchFile(char *buffer, int clientSoc, char *command)
     char *cmd = strtok(buffer, ":");
     char *plens = strtok(NULL, ":");
     char *file_name = strtok(NULL, ":");
-    //printf("Sending file to client: %s", file_name);
+    //printf("[SERVER] Sending file to client: %s", file_name);
     int foundFile = fileExists(file_name);
     if (!foundFile)
     {
@@ -1000,8 +1000,8 @@ void fetchFile(char *buffer, int clientSoc, char *command)
     strcat(send, messageLen);
     strcat(send, ":");
     strcat(send, content);
-    //printf("%s\n", content);
-    //printf("%s\n", send);
+    //printf("[SERVER] %s\n", content);
+    //printf("[SERVER] %s\n", send);
     block_write(clientSoc, send, totalLen);
 
     free(content);
@@ -1019,7 +1019,7 @@ int remove_directory(char *dirPath)
     DIR *dir = opendir(dirPath);
     if (dir == NULL)
     {
-        printf("ERROR this is not a directory.\n");
+        printf("[SERVER] ERROR this is not a directory.\n");
         return -1;
     }
     r = 0;
@@ -1065,7 +1065,7 @@ void destroyProject(char *buffer, int clientSoc)
         free(project_name);
         int n = write(clientSoc, "44:ERROR the project does not exist on server.\n", 47);
         if (n < 0)
-            printf("ERROR writing to the client.\n");
+            printf("[SERVER] ERROR writing to the client.\n");
         return;
     }
 
@@ -1105,7 +1105,7 @@ void inc_command_length(char *dirPath, pthread_mutex_t m)
     DIR *dir = opendir(dirPath);
     if (dir == NULL)
     {
-        printf("ERROR opening directory.\n");
+        printf("[SERVER] ERROR opening directory.\n");
         return;
     }
     else
@@ -1154,7 +1154,7 @@ char *checkoutProject(char *command, char *dirPath, int clientSoc)
     DIR *dir = opendir(dirPath);
     if (dir == NULL)
     {
-        printf("ERROR opening directory.\n");
+        printf("[SERVER] ERROR opening directory.\n");
         return NULL;
     }
     else
@@ -1316,7 +1316,7 @@ void createProject(char *buffer, int clientSoc)
     /*write command to client*/
     int n = write(clientSoc, new_command, size);
     if (n < 0)
-        printf("ERROR writing to the client.\n");
+        printf("[SERVER] ERROR writing to the client.\n");
 
     /*free stuff*/
     free(project_name);
@@ -1393,7 +1393,7 @@ void parseRead(char *buffer, int clientSoc)
         }
         else
         {
-            printf("Have not implemented this command yet!\n");
+            printf("[SERVER] Have not implemented this command yet!\n");
         }
         free(command);
     }
@@ -1416,7 +1416,7 @@ char *block_read(int fd, int targetBytes)
     } while (status > 0 && readIn < targetBytes);
     buffer[targetBytes] = '\0';
     if (readIn < 0)
-        printf("ERROR reading from socket");
+        printf("[SERVER] ERROR reading from socket");
     return buffer;
 }
 
@@ -1431,7 +1431,7 @@ void block_write(int fd, char *data, int targetBytes)
         readIn += status;
     } while (status > 0 && readIn < targetBytes);
     if (readIn < 0)
-        printf("ERROR writing to socket");
+        printf("[SERVER] ERROR writing to socket");
 }
 
 int read_len_message(int fd)
@@ -1459,7 +1459,7 @@ int read_len_message(int fd)
 
 void clean_up_code()
 {
-    printf("Clean up your code before exiting.\n");
+    printf("[SERVER] Clean up your code before exiting.\n");
     exit(0);
 }
 
@@ -1468,7 +1468,7 @@ void sig_handler(int signo)
 {
     if (signo == SIGINT)
     {
-        printf("received SIGINT\n");
+        printf("[SERVER] received SIGINT\n");
         atexit(clean_up_code);
         exit(0);
     }
@@ -1487,13 +1487,13 @@ void *mainThread(void *arg)
             continue;
         if (strcmp(buffer, "Done") == 0)
         {
-            printf("Client Disconnected\n");
+            printf("[SERVER] Client Disconnected\n");
             free(buffer);
             break;
         }
         else if (strcmp(buffer, "Successfully connected to client.\n") == 0)
         {
-            printf("%s\n", buffer);
+            printf("[SERVER] %s\n", buffer);
             block_write(clientSock, "34:Successfully connected to server.\n", 37);
         }
         else
@@ -1502,7 +1502,7 @@ void *mainThread(void *arg)
         }
         free(buffer);
     }
-    printf("Server Disconnected\n");
+    printf("[SERVER] Server Disconnected\n");
     close(clientSock);
     pthread_exit(NULL);
 }
@@ -1514,7 +1514,7 @@ void set_up_connection(char *port)
     /* Set up Listening Socket */
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0)
-        printf("ERROR opening socket");
+        printf("[SERVER] ERROR opening socket");
     bzero((char *)&serv_addr, sizeof(serv_addr));
     int portno = atoi(port);
 
@@ -1524,12 +1524,12 @@ void set_up_connection(char *port)
     serv_addr.sin_port = htons(portno);
     if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
     {
-        printf("Fatal Error: on binding");
+        printf("[SERVER] Fatal Error: on binding");
         exit(0);
     }
     /*listen on port*/
     listen(sockfd, 10);
-    printf("Server Listening\n");
+    printf("[SERVER] Server Listening\n");
 
     /*Initialize the mutex array structure*/
     int num_of_projects = find_all_projects();
@@ -1554,7 +1554,7 @@ void set_up_connection(char *port)
         /*Handing SIGINT*/
         if (signal(SIGINT, sig_handler) == SIG_ERR)
         {
-            printf("ERROR cannot catch SIGINT.\n");
+            printf("[SERVER] ERROR cannot catch SIGINT.\n");
         }
 
         /* Accept Client Connection = Blocking command */
@@ -1562,14 +1562,14 @@ void set_up_connection(char *port)
         clientSoc = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
         if (clientSoc < 0)
         {
-            printf("ERROR on accept\n");
+            printf("[SERVER] ERROR on accept\n");
         }
         else
         {
             int error = pthread_create(&tid[i], NULL, mainThread, &clientSoc);
             if (error < 0)
             {
-                printf("ERROR unable to create thread.\n");
+                printf("[SERVER] ERROR unable to create thread.\n");
             }
             //pthread_detach(tid[i]);
             i++;
@@ -1607,7 +1607,7 @@ int main(int argc, char **argv)
     int n;
     if (argc < 2)
     {
-        printf("ERROR: No port provided\n");
+        printf("[SERVER] ERROR: No port provided\n");
         exit(1);
     }
 
