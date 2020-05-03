@@ -12,6 +12,17 @@ int cmd_count = 0;
 MutexArray* array_of_mutexes[5];
 int array_of_mutexes_size = 5;
 
+void untarFile(char *file)
+{
+    char *command = malloc(sizeof(char) + 1 + 8 + strlen(file));
+    strcpy(command, "tar -xf ");
+    // strcat(command, "./history/");
+    strcat(command, file);
+    //strcat(command, " -C .");
+    printf("%s\n", command);
+    system(command);
+}
+
 char *extract_path(char *path)
 {
     int size = strlen(path);
@@ -255,11 +266,13 @@ void rollback(char *buffer, int clientSoc)
         return;    
     }
 
-    char *tar_name_2 = (char *)malloc(strlen(project_name) + digits(req_version)+ strlen(".tar")+1 * sizeof(char));
+    char *tar_name_2 = (char *)malloc(strlen("history/") + strlen(project_name) + digits(req_version)+ strlen(".tar")+1 * sizeof(char));
     tar_name_2[0] = '\0';
+    strcat(tar_name_2, "history/");
     strcat(tar_name_2, project_name);
     strcat(tar_name_2, "-");
     strcat(tar_name_2, to_Str(req_version));
+    strcat(tar_name_2, ".tar");
     untarFile(tar_name_2);    
 
     // Boolean found = false;
@@ -582,9 +595,8 @@ void push_commits(char *buffer, int clientSoc)
         strcat(tar_name, ".tar");
         Boolean found = search_tars(tar_name);
         if(found == false){
-            char *tar_name_2 = (char *)malloc(strlen("history/")+strlen(project_name) + strlen(number)+1* sizeof(char));
+            char *tar_name_2 = (char *)malloc(strlen(project_name) + strlen(number)+1* sizeof(char));
             tar_name_2[0] = '\0';
-            strcat(tar_name_2, "history/");
             strcat(tar_name_2, project_name);
             strcat(tar_name_2, "-");
             strcat(tar_name_2, number);

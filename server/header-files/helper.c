@@ -239,18 +239,18 @@ void tarFile(char *file, char* dir)
     strcpy(command, "tar -cf history/");
     strcat(command, file);
     strcat(command, ".tar ");
-    strcat(command, file);
+    strcat(command, dir);
     printf("%s\n", command);
     system(command);
     //tar -cf history/pojjname.tar proj0
 }
-void untarFile(char *file)
-{
-    char *command = malloc(sizeof(char) + 1 + 8 + strlen(file));
-    strcpy(command, "tar -xf ");
-    // strcat(command, "./history/");
-    strcat(command, file);
-    //strcat(command, " -C .");
-    printf("%s\n", command);
-    system(command);
-}
+// void untarFile(char *file)
+// {
+//     char *command = malloc(sizeof(char) + 1 + 8 + strlen(file));
+//     strcpy(command, "tar -xf ");
+//     // strcat(command, "./history/");
+//     strcat(command, file);
+//     //strcat(command, " -C .");
+//     printf("%s\n", command);
+//     system(command);
+// }
