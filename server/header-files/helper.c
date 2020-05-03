@@ -185,7 +185,7 @@ void checkIPbuffer(char *IPbuffer)
 /*Returns the IP address of a machine!*/ 
 char* get_host_name()
 { 
-    char hostbuffer[256]; 
+    char* hostbuffer = (char*)malloc(256*sizeof(char)); 
     char *IPbuffer; 
     struct hostent *host_entry; 
     int hostname; 
@@ -201,7 +201,7 @@ char* get_host_name()
     // To convert an Internet network address into ASCII string 
     IPbuffer = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0])); 
   
-    return IPbuffer; 
+    return hostbuffer; 
 } 
 
 char *fetch_file_from_client(char *fileName, int clientSoc)

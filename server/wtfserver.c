@@ -204,13 +204,14 @@ void rollback(char *buffer, int clientSoc)
 
     /*Get the requested version number*/
     bcount += (strlen(project_name) + 1);
-    int count = bcount;
-    while (buffer[count] != '\0')
+    int count = bcount; //17
+    while (buffer[count] != ':')
     {
         count++;
-        bcount++;
     }
-    int nlen = count - bcount;
+    //count = 18
+    int nlen = count-bcount; //1
+    bcount = (count+1);
     int req_version = atoi(getSubstring(bcount, buffer, nlen));
 
     /*Traverse history folder - if the version number is greater then the requested then delete that version*/
@@ -369,7 +370,6 @@ void push_commits(char *buffer, int clientSoc)
 
     /*mutex stuff*/
     pthread_mutex_t m = find_mutex(project_name);
-    pthread_mutex_unlock(&m);
     pthread_mutex_lock(&m);
 
     /*check if the project exists in the server*/
@@ -410,7 +410,7 @@ void push_commits(char *buffer, int clientSoc)
         // free(project_name);
         // free(file_content);
         // free(pserver);
-        block_write(clientSoc, "21:Push command failed!\n", 24);
+        block_write(clientSoc, "21:Push command failed 1!\n", 24);
         return;
     }
 
@@ -426,7 +426,7 @@ void push_commits(char *buffer, int clientSoc)
         // free(project_name);
         // free(file_content);
         // free(pserver);
-        block_write(clientSoc, "21:Push command failed!\n", 24);
+        block_write(clientSoc, "21:Push command failed 2!\n", 24);
         return;
     }
 
@@ -536,7 +536,7 @@ void push_commits(char *buffer, int clientSoc)
                 // freeRecord(client_manifest, 'm', client_manifest_size);
                 // freeRecord(active_commit, 'u', active_commit_size);
                 printf("ERROR could not find the file in the manifest. Update?\n");
-                block_write(clientSoc, "21:Push command failed!\n", 24);
+                block_write(clientSoc, "21:Push command failed 3!\n", 24);
                 return;
             }
             /*Get the file from the client and read what the new contents of the file are!*/
@@ -554,7 +554,7 @@ void push_commits(char *buffer, int clientSoc)
                 // freeRecord(server_manifest, 'm', server_manifest_size);
                 // freeRecord(client_manifest, 'm', client_manifest_size);
                 // freeRecord(active_commit, 'u', active_commit_size);
-                block_write(clientSoc, "21:Push command failed!\n", 24);
+                block_write(clientSoc, "21:Push command failed 4!\n", 24);
                 return;
             }
             // mkdir_recursive(filepath); //for subdirectories ^_^ (hopefully it works)
@@ -572,7 +572,7 @@ void push_commits(char *buffer, int clientSoc)
                 // freeRecord(server_manifest, 'm', server_manifest_size);
                 // freeRecord(client_manifest, 'm', client_manifest_size);
                 // freeRecord(active_commit, 'u', active_commit_size);
-                block_write(clientSoc, "21:Push command failed!\n", 24);
+                block_write(clientSoc, "21:Push command failed 5!\n", 24);
                 return;
             }
             if(strcmp(newContent, "empty")!=0){
@@ -611,7 +611,7 @@ void push_commits(char *buffer, int clientSoc)
                 // freeRecord(server_manifest, 'm', server_manifest_size);
                 // freeRecord(client_manifest, 'm', client_manifest_size);
                 // freeRecord(active_commit, 'u', active_commit_size);
-                block_write(clientSoc, "21:Push command failed!\n", 24);
+                block_write(clientSoc, "21:Push command failed 6!\n", 24);
                 return;
             }
             /*add the new file to the manifest*/
@@ -629,7 +629,7 @@ void push_commits(char *buffer, int clientSoc)
                 // freeRecord(server_manifest, 'm', server_manifest_size);
                 // freeRecord(client_manifest, 'm', client_manifest_size);
                 // freeRecord(active_commit, 'u', active_commit_size);
-                block_write(clientSoc, "21:Push command failed!\n", 24);
+                block_write(clientSoc, "21:Push command failed 7!\n", 24);
                 return;
             }
             else
@@ -662,7 +662,7 @@ void push_commits(char *buffer, int clientSoc)
                 // freeRecord(server_manifest, 'm', server_manifest_size);
                 // freeRecord(client_manifest, 'm', client_manifest_size);
                 // freeRecord(active_commit, 'u', active_commit_size);
-                block_write(clientSoc, "21:Push command failed!\n", 24);
+                block_write(clientSoc, "21:Push command failed 8!\n", 24);
                 return;
             }
             mkdir_recursive(filepath);
@@ -672,7 +672,7 @@ void push_commits(char *buffer, int clientSoc)
             {
                 expire_pending_commits(project_name, "");
                 printf("Fatal Error: Could not open Update file");
-                block_write(clientSoc, "21:Push command failed!\n", 24);
+                block_write(clientSoc, "21:Push command failed 9!\n", 24);
                 return;
             }
             if(strcmp(newContent, "empty")!=0){
@@ -700,7 +700,7 @@ void push_commits(char *buffer, int clientSoc)
         else
         {
             printf("ERROR action not implemented.\n");
-            block_write(clientSoc, "21:Push command failed!\n", 24);
+            block_write(clientSoc, "21:Push command failed 10!\n", 24);
         }
         x++;
     }
@@ -788,6 +788,7 @@ void create_commit_file(char *buffer, int clientSoc)
 
     /*make commit file*/
     char *hostname = get_host_name();
+    printf("%s\n", hostname);
     char *pserver = (char *)malloc(strlen(project_name) + strlen(hostname) + strlen("/pending-commits/.Commit-"));
     pserver[0] = '\0';
     strcat(pserver, project_name);
