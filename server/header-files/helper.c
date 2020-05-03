@@ -235,21 +235,21 @@ char *fetch_file_from_client(char *fileName, int clientSoc)
 /* tar extra credit */
 void tarFile(char *file)
 {
-    char *command = malloc(sizeof(char) + 1 + 13 + 2 * strlen(file));
-    strcpy(command, "tar -cf ");
+    char *command = malloc(sizeof(char) + 1 + 21 + (2 * strlen(file)));
+    strcpy(command, "tar -cf history/");
     strcat(command, file);
     strcat(command, ".tar ");
     strcat(command, file);
-    //printf("%s\n", command);
+    printf("%s\n", command);
     system(command);
+    //tar -cf history/pojjname.tar proj0
 }
 void untarFile(char *file)
 {
-    char *command = malloc(sizeof(char) + 1 + 13 + 2 * strlen(file));
+    char *command = malloc(sizeof(char) + 1 + 8 + strlen(file));
     strcpy(command, "tar -xf ");
     strcat(command, file);
-    strcat(command, ".tar ");
-    strcat(command, file);
-    //printf("%s\n", command);
+    //strcat(command, " -C .");
+    printf("%s\n", command);
     system(command);
 }

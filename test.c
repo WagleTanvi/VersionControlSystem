@@ -121,7 +121,7 @@ int main(int argc, char **argv)
 {
     if (argc < 4)
     {
-        printf("Enter a host, a port and testcase number 1-2\n");
+        printf("Enter a host, a port and sequence number 1-2\n");
         return 0;
     }
     int fd = open("tests", O_WRONLY | O_CREAT | O_TRUNC, 0700);
@@ -148,6 +148,12 @@ int main(int argc, char **argv)
     else if (strcmp(argv[3], "2") == 0)
     {
         test2(fd);
+    }
+    else
+    {
+        printf("Only sequence numbers are 1 and 2\n");
+        unlink("tests");
+        return 0;
     }
     write(fd, "echo '=============================================='\n", 54);
     write(fd, "echo 'Killing Server Proccess'\n", 31);

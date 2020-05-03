@@ -820,7 +820,7 @@ Boolean add_file_to_record(char *projectName, char *fileName, char *recordPath)
     Record **record_arr = create_record_struct(manifestData, true);
     if (search_Record(record_arr, fileName))
     {
-        printf("[CLIENT] Fatal Error: File %s already exists in Record\n", fileName);
+        printf("[CLIENT] ERROR File %s already exists in Record\n", fileName);
     }
     else
     {
@@ -873,7 +873,7 @@ Boolean remove_file_from_record(char *projectName, char *fileName, char *recordP
     }
     if (!remove)
     {
-        printf("[CLIENT] Fatal Error: record does not contain file\n");
+        printf("[CLIENT] ERROR record does not contain file\n");
         return false;
     }
     freeRecord(record_arr, 'm', getRecordStructSize(record_arr));
