@@ -2,14 +2,15 @@
 #include "header-files/record.h"
 
 /*Create a struct that holds the project name and the mutex. Basically a hashmap that links project name with a mutex.*/
-typedef struct MutexArray{
-    char* projectName;
+typedef struct MutexArray
+{
+    char *projectName;
     pthread_mutex_t mutex;
 } MutexArray;
 
 int cmd_count = 0;
 
-MutexArray* array_of_mutexes[5];
+MutexArray *array_of_mutexes[5];
 int array_of_mutexes_size = 5;
 
 char *extract_path(char *path)
@@ -32,17 +33,22 @@ char *extract_path(char *path)
 }
 
 /*Returns all the projects in the CWD*/
-int find_all_projects(){
+int find_all_projects()
+{
     char path[4096];
     int count = 0;
     struct dirent *d;
     DIR *dir = opendir("./");
-    if (dir == NULL){
+    if (dir == NULL)
+    {
         return 0;
-    }    
-    while ((d = readdir(dir)) != NULL) {
-        if(strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, "header-files") == 0) continue;
-        if (d->d_type == DT_DIR){
+    }
+    while ((d = readdir(dir)) != NULL)
+    {
+        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, "header-files") == 0)
+            continue;
+        if (d->d_type == DT_DIR)
+        {
             count++;
         }
     }
@@ -51,18 +57,23 @@ int find_all_projects(){
 }
 
 /*Returns the names of all the  projects in the CWD as a string array*/
-char** get_project_names(int size){
+char **get_project_names(int size)
+{
     char path[4096];
-    char** project_names = (char**)malloc(size*sizeof(char*));
+    char **project_names = (char **)malloc(size * sizeof(char *));
     struct dirent *d;
     DIR *dir = opendir("./");
-    if (dir == NULL){
+    if (dir == NULL)
+    {
         return NULL;
-    }    
+    }
     int i = 0;
-    while ((d = readdir(dir)) != NULL) {
-        if(strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, "header-files") == 0) continue;
-        if (d->d_type == DT_DIR){
+    while ((d = readdir(dir)) != NULL)
+    {
+        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, "header-files") == 0)
+            continue;
+        if (d->d_type == DT_DIR)
+        {
             project_names[i] = d->d_name;
             i++;
         }
@@ -72,10 +83,13 @@ char** get_project_names(int size){
 }
 
 /*Returns the corresponding mutex to the project name*/
-pthread_mutex_t find_mutex(char* pname){
+pthread_mutex_t find_mutex(char *pname)
+{
     int i = 0;
-    while(i < array_of_mutexes_size){
-        if(strcmp(array_of_mutexes[i]->projectName,pname)==0){
+    while (i < array_of_mutexes_size)
+    {
+        if (strcmp(array_of_mutexes[i]->projectName, pname) == 0)
+        {
             return array_of_mutexes[i]->mutex;
         }
         i++;
@@ -85,7 +99,7 @@ pthread_mutex_t find_mutex(char* pname){
 //=============================== HISTORY ======================
 void save_history(char *commitData, char *projectName, char *version)
 {
-    char *filePath = (char *)malloc(strlen(projectName)+strlen("/.History") * sizeof(int));
+    char *filePath = (char *)malloc(strlen(projectName) + strlen("/.History") * sizeof(int));
     filePath[0] = '\0';
     strcat(filePath, projectName);
     strcat(filePath, "/.History");
@@ -95,7 +109,7 @@ void save_history(char *commitData, char *projectName, char *version)
         printf("Fatal Error: Could not open History file");
         return;
     }
-    write(fd, "Project version: ", strlen("Project version: "));
+    //write(fd, "Project version: ", strlen("Project version: "));
     write(fd, version, strlen(version));
     write(fd, commitData, strlen(commitData));
     free(filePath);
@@ -115,15 +129,18 @@ char *get_current_version(char *buffer, int clientSoc, char flag)
     bcount += strlen(plens) + 1;
     int pleni = atoi(plens);
     char *project_name = getSubstring(bcount, buffer, pleni);
-    
+
     int foundProj = 0;
-    if(flag = 'H'){ //this is getting the current version for rollback
+    if (flag = 'H')
+    { //this is getting the current version for rollback
         DIR *dir = opendir(project_name);
-        if(dir != NULL){
+        if (dir != NULL)
+        {
             foundProj = 1;
         }
     }
-    else {
+    else
+    {
         foundProj = search_proj_exists(project_name);
     }
 
@@ -141,7 +158,8 @@ char *get_current_version(char *buffer, int clientSoc, char flag)
     strcat(manifestpath, project_name);
     strcat(manifestpath, "/.Manifest");
     int fd = open(manifestpath, O_RDONLY, 0775);
-    if(fd < 0){
+    if (fd < 0)
+    {
         block_write(clientSoc, "37:ERROR failed to get current version.\n", 40);
         return;
     }
@@ -154,9 +172,10 @@ char *get_current_version(char *buffer, int clientSoc, char flag)
         status = read(fd, version_buf + readIn, 1);
         readIn += status;
     } while (version_buf[readIn - 1] != '\n' && status > 0);
-    char* num = (char*)malloc(20*sizeof(char));
+    char *num = (char *)malloc(20 * sizeof(char));
     int i = 0;
-    while(i < strlen(version_buf)){
+    while (i < strlen(version_buf))
+    {
         num[i] = version_buf[i];
         i++;
     }
@@ -168,9 +187,10 @@ char *get_current_version(char *buffer, int clientSoc, char flag)
 
 //=============================== ROLLBACK ======================
 /*Returns a string to send to current version*/
-char* current_version_format(char* req_dir){
-    char* len = to_Str(strlen(req_dir));
-    char* formatted = (char*)malloc(strlen("currentversion")+1+digits(strlen(req_dir))+1+strlen(req_dir));
+char *current_version_format(char *req_dir)
+{
+    char *len = to_Str(strlen(req_dir));
+    char *formatted = (char *)malloc(strlen("currentversion") + 1 + digits(strlen(req_dir)) + 1 + strlen(req_dir));
     formatted[0] = '\0';
     strcat(formatted, "currentversion:");
     strcat(formatted, len);
@@ -218,7 +238,7 @@ void rollback(char *buffer, int clientSoc)
     history_dir[0] = '\0';
     strcat(history_dir, project_name);
     strcat(history_dir, "/history\0");
-    char *new_project_name = (char*)malloc(strlen(project_name)+5*sizeof(char));
+    char *new_project_name = (char *)malloc(strlen(project_name) + 5 * sizeof(char));
     Boolean found = false;
     char path[4096];
     struct dirent *d;
@@ -235,12 +255,12 @@ void rollback(char *buffer, int clientSoc)
             continue;
         if (d->d_type == DT_DIR)
         {
-            char* req_dir = (char*)malloc(strlen(project_name)+1+strlen("history")+1+strlen(d->d_name));
+            char *req_dir = (char *)malloc(strlen(project_name) + 1 + strlen("history") + 1 + strlen(d->d_name));
             req_dir[0] = '\0';
             strcat(req_dir, project_name);
             strcat(req_dir, "/history/");
             strcat(req_dir, d->d_name);
-            char* format_str = current_version_format(req_dir);
+            char *format_str = current_version_format(req_dir);
             int version_num = atoi(get_current_version(format_str, clientSoc, 'H'));
             if (version_num == req_version)
             {
@@ -272,7 +292,7 @@ void rollback(char *buffer, int clientSoc)
     duplicate_dir(project_path, new_project_name);
 
     /*Renaming doesn't work for some reason >__<*/
-    char* old_name = (char*)malloc(strlen(project_name)+strlen("-old"));
+    char *old_name = (char *)malloc(strlen(project_name) + strlen("-old"));
     old_name[0] = '\0';
     strcat(old_name, project_name);
     strcat(old_name, "-old");
@@ -326,7 +346,8 @@ void duplicate_dir(char *project_path, const char *new_project_path)
     closedir(dir);
 }
 
-void expire_pending_commits(char* project_name, char* good_commit){
+void expire_pending_commits(char *project_name, char *good_commit)
+{
     char path[4096];
     struct dirent *d;
 
@@ -334,7 +355,7 @@ void expire_pending_commits(char* project_name, char* good_commit){
     pserver[0] = '\0';
     strcat(pserver, project_name);
     strcat(pserver, "/pending-commits");
-    
+
     DIR *dir = opendir(pserver);
     if (dir == NULL)
     {
@@ -346,9 +367,12 @@ void expire_pending_commits(char* project_name, char* good_commit){
         snprintf(path, 4096, "%s/%s", pserver, d->d_name);
         if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0)
             continue;
-        if(strcmp(d->d_name, good_commit)==0){
+        if (strcmp(d->d_name, good_commit) == 0)
+        {
             continue;
-        } else {
+        }
+        else
+        {
             int u = unlink(path);
         }
     }
@@ -358,7 +382,7 @@ void expire_pending_commits(char* project_name, char* good_commit){
 //push:23:projectname:234:blahblahcommintcontent
 void push_commits(char *buffer, int clientSoc)
 {
-    /*get project name*/ 
+    /*get project name*/
     int bcount = 0;
     char *cmd = strtok(buffer, ":");
     bcount += strlen(cmd) + 1;
@@ -385,7 +409,8 @@ void push_commits(char *buffer, int clientSoc)
     /*Get the commit file data*/
     bcount += (strlen(project_name) + 1);
     int count = bcount;
-    while (buffer[count] != ':'){
+    while (buffer[count] != ':')
+    {
         count++;
     }
     int nlen = count - bcount;
@@ -402,10 +427,11 @@ void push_commits(char *buffer, int clientSoc)
     strcat(pserver, project_name);
     strcat(pserver, "/pending-commits/.Commit-");
     strcat(pserver, hostname);
-    char* server_file_content = getFileContent(pserver, "");
+    char *server_file_content = getFileContent(pserver, "");
 
     /*server commit file doesn't exist*/
-    if(server_file_content == NULL){
+    if (server_file_content == NULL)
+    {
         expire_pending_commits(project_name, "");
         // free(project_name);
         // free(file_content);
@@ -415,11 +441,14 @@ void push_commits(char *buffer, int clientSoc)
     }
 
     /*server and client commits do not match*/
-    if(strcmp(file_content, server_file_content)!=0){
-        if(strcmp(server_file_content, "") == 0){
+    if (strcmp(file_content, server_file_content) != 0)
+    {
+        if (strcmp(server_file_content, "") == 0)
+        {
             printf("ERROR the server commit file is empty.\n");
         }
-        else{
+        else
+        {
             printf("ERROR the client and sever commit files do not match.\n");
         }
         expire_pending_commits(project_name, "");
@@ -432,8 +461,8 @@ void push_commits(char *buffer, int clientSoc)
 
     /*save this push to the history*/
     int num = number_of_lines(server_file_content);
-    char* format_str = current_version_format(project_name);
-    char* version_num = get_current_version(format_str, clientSoc, 'N');
+    char *format_str = current_version_format(project_name);
+    char *version_num = get_current_version(format_str, clientSoc, 'N');
     save_history(server_file_content, project_name, version_num);
 
     /*Expire the other pending commits*/
@@ -458,7 +487,7 @@ void push_commits(char *buffer, int clientSoc)
     bcount += (strlen(size2) + 1);
     char *file_content2 = getSubstring(bcount, buffer, atoi(size2));
     bcount += (strlen(file_content2) + 1);
-  //  free(size2);
+    //  free(size2);
 
     /*Get the current server manifest that is in the folder*/
     char *manifestpath = (char *)malloc(strlen(project_name) + strlen("./Manifest") * sizeof(char));
@@ -468,12 +497,12 @@ void push_commits(char *buffer, int clientSoc)
     char *manifest_data = getFileContent(manifestpath, "");
     Record **server_manifest = create_record_struct(manifest_data, num, 'M');
     int server_manifest_size = getRecordStructSize(server_manifest);
-   // free(manifest_data);
+    // free(manifest_data);
 
     /*Get the client manifest- make it into a record struct*/
     Record **client_manifest = create_record_struct(file_content2, 0, 'M');
     int client_manifest_size = getRecordStructSize(server_manifest);
-  //  free(file_content2);
+    //  free(file_content2);
 
     /*make a history folder to store all the old commits*/
     char *history_dir = (char *)malloc(strlen(project_name) + strlen("/history\0") * sizeof(char));
@@ -484,12 +513,12 @@ void push_commits(char *buffer, int clientSoc)
     int ch = chmod(history_dir, 0775);
     if (ch < 0)
         printf("ERROR set permission error.\n");
-   // free(history_dir);
+    // free(history_dir);
 
     /*move old project to the history folder*/
     char *new_project_name = (char *)malloc(strlen(project_name) + 3 * sizeof(char));
     int project_version = atoi(server_manifest[0]->version);
-    char* v_len = to_Str(project_version);
+    char *v_len = to_Str(project_version);
     new_project_name[0] = '\0';
     strcat(new_project_name, project_name);
     strcat(new_project_name, "-");
@@ -513,14 +542,14 @@ void push_commits(char *buffer, int clientSoc)
     while (x < commit_size)
     {
         if (strcmp(active_commit[x]->version, "M") == 0)
-        {    
+        {
             //modify code
             char *filepath = active_commit[x]->file;
             Record *manifest_rec = search_record(server_manifest, filepath);
             Record *client_manifest_rec = search_record(client_manifest, filepath);
             if (manifest_rec != NULL)
             {
-                manifest_rec->version = to_Str(atoi(client_manifest_rec->version)+1);
+                manifest_rec->version = to_Str(atoi(client_manifest_rec->version) + 1);
                 manifest_rec->hash = active_commit[x]->hash;
             }
             else
@@ -575,7 +604,8 @@ void push_commits(char *buffer, int clientSoc)
                 block_write(clientSoc, "21:Push command failed!\n", 24);
                 return;
             }
-            if(strcmp(newContent, "empty")!=0){
+            if (strcmp(newContent, "empty") != 0)
+            {
                 block_write(fd, newContent, strlen(newContent));
             }
         }
@@ -675,7 +705,8 @@ void push_commits(char *buffer, int clientSoc)
                 block_write(clientSoc, "21:Push command failed!\n", 24);
                 return;
             }
-            if(strcmp(newContent, "empty")!=0){
+            if (strcmp(newContent, "empty") != 0)
+            {
                 block_write(fd, newContent, strlen(newContent));
             }
         }
@@ -684,14 +715,15 @@ void push_commits(char *buffer, int clientSoc)
             char *filepath = active_commit[x]->file;
             int y = 1;
             int size = getRecordStructSize(server_manifest);
-            while (y < size){
-                if (server_manifest[y] != NULL && server_manifest[y]->file != NULL && strcmp(server_manifest[y]->file, filepath) == 0){
+            while (y < size)
+            {
+                if (server_manifest[y] != NULL && server_manifest[y]->file != NULL && strcmp(server_manifest[y]->file, filepath) == 0)
+                {
                     free(server_manifest[y]->version);
                     free(server_manifest[y]->file);
                     free(server_manifest[y]->hash);
                     free(server_manifest[y]);
                     server_manifest[y] = NULL;
-
                 }
                 y++;
             }
@@ -739,7 +771,7 @@ void push_commits(char *buffer, int clientSoc)
 
     /*tell the client that push was successful*/
     block_write(clientSoc, "32:Server has successfully pushed.\n", 35);
-    
+
     /*free stuff*/
     // free(project_name);
     // free(file_content);
@@ -782,7 +814,8 @@ void create_commit_file(char *buffer, int clientSoc)
     strcat(pending_commits, "/pending-commits\0");
     mkdir_recursive(pending_commits);
     int ch = chmod(pending_commits, 0775);
-    if (ch < 0){
+    if (ch < 0)
+    {
         printf("ERROR set permission error.\n");
     }
 
@@ -914,9 +947,12 @@ void fetchServerManifest(char *buffer, int clientSoc)
     int s = send_manifest(project_name, clientSoc);
 
     /*More error checking*/
-    if (s == -1){
+    if (s == -1)
+    {
         printf("ERROR sending Manifest to client./\n");
-    } else if (s == -2){
+    }
+    else if (s == -2)
+    {
         printf("ERROR cannot find Manifest file./\n");
     }
     free(project_name);
@@ -980,7 +1016,8 @@ int remove_directory(char *dirPath)
     char path[4096];
     struct dirent *d;
     DIR *dir = opendir(dirPath);
-    if (dir == NULL){
+    if (dir == NULL)
+    {
         printf("ERROR this is not a directory.\n");
         return -1;
     }
@@ -991,16 +1028,19 @@ int remove_directory(char *dirPath)
         snprintf(path, 4096, "%s/%s", dirPath, d->d_name);
         if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0)
             continue;
-        if (d->d_type == DT_DIR){
+        if (d->d_type == DT_DIR)
+        {
             r2 = remove_directory(path);
         }
-        else{
+        else
+        {
             r2 = unlink(path);
         }
         r = r2;
     }
     closedir(dir);
-    if (r == 0){
+    if (r == 0)
+    {
         r = rmdir(dirPath);
     }
     return 0;
@@ -1036,14 +1076,15 @@ void destroyProject(char *buffer, int clientSoc)
     pthread_mutex_t m = find_mutex(project_name);
     pthread_mutex_unlock(&m);
     pthread_mutex_lock(&m);
-        int r = remove_directory(pserver);
+    int r = remove_directory(pserver);
     pthread_mutex_unlock(&m);
 
     free(project_name);
     free(pserver);
 
     /*Send message to client*/
-    if (r < 0){
+    if (r < 0)
+    {
         block_write(clientSoc, "27:Failed to destroy project.\n", 31);
     }
     else
@@ -1069,9 +1110,9 @@ void inc_command_length(char *dirPath, pthread_mutex_t m)
     else
     {
         pthread_mutex_lock(&m);
-            cmd_count += (digits(strlen(dirPath)));
-            cmd_count += (strlen(dirPath));
-            cmd_count += 4;
+        cmd_count += (digits(strlen(dirPath)));
+        cmd_count += (strlen(dirPath));
+        cmd_count += 4;
         pthread_mutex_unlock(&m);
     }
     while ((d = readdir(dir)) != NULL)
@@ -1082,16 +1123,16 @@ void inc_command_length(char *dirPath, pthread_mutex_t m)
         if (d->d_type != DT_DIR)
         {
             pthread_mutex_lock(&m);
-                /*for a file*/
-                cmd_count += (digits(strlen(path)));
-                cmd_count += (strlen(path));
-                cmd_count += 6;
+            /*for a file*/
+            cmd_count += (digits(strlen(path)));
+            cmd_count += (strlen(path));
+            cmd_count += 6;
 
-                /*for the file content*/
-                char *data_client = getFileContent(path, "C");
-                cmd_count += (digits(strlen(data_client)));
-                cmd_count += (strlen(data_client));
-                cmd_count += 2;
+            /*for the file content*/
+            char *data_client = getFileContent(path, "C");
+            cmd_count += (digits(strlen(data_client)));
+            cmd_count += (strlen(data_client));
+            cmd_count += 2;
             pthread_mutex_unlock(&m);
             free(data_client);
         }
@@ -1208,17 +1249,17 @@ void createProject(char *buffer, int clientSoc)
         }
 
         /*make project folder and set permissions*/
-        char *pserver = (char *)malloc(strlen(project_name) + strlen("/.Manifest")+1);
+        char *pserver = (char *)malloc(strlen(project_name) + strlen("/.Manifest") + 1);
         check_malloc_null(pserver);
         pserver[0] = '\0';
         strcat(pserver, project_name);
         mkdir_recursive(pserver);
         int ch = chmod(pserver, 0775);
-        if (ch < 0){
+        if (ch < 0)
+        {
             block_write(clientSoc, "43:ERROR setting permissions for new project.\n", 46);
             return;
         }
-            
 
         /*make manifest file*/
         strcat(pserver, "/.Manifest");
@@ -1245,8 +1286,8 @@ void createProject(char *buffer, int clientSoc)
     pthread_mutex_t m = find_mutex(project_name);
     pthread_mutex_unlock(&m);
     pthread_mutex_lock(&m);
-        cmd_count = 0;
-        cmd_count += (strlen(cmd) + 1);
+    cmd_count = 0;
+    cmd_count += (strlen(cmd) + 1);
     pthread_mutex_unlock(&m);
 
     inc_command_length(project_name, m);
@@ -1255,20 +1296,21 @@ void createProject(char *buffer, int clientSoc)
     strcat(command, cmd);
     strcat(command, ":");
     command = checkoutProject(command, project_name, clientSoc);
-    if(command == NULL){
+    if (command == NULL)
+    {
         block_write(clientSoc, "25:ERROR creating protocol.\n", 28);
         return;
     }
 
-    /*add the length of the full commmand to the front of the protocol*/    
-    int size = digits(strlen(command))+1+strlen(command)+2;
-    char *new_command = (char *)malloc(size*sizeof(char));
+    /*add the length of the full commmand to the front of the protocol*/
+    int size = digits(strlen(command)) + 1 + strlen(command) + 2;
+    char *new_command = (char *)malloc(size * sizeof(char));
     new_command[0] = '\0';
-    char* slen = to_Str(strlen(command));
+    char *slen = to_Str(strlen(command));
     strcat(new_command, slen);
     strcat(new_command, ":");
     strcat(new_command, command);
-    new_command[size-1] = '\0';
+    new_command[size - 1] = '\0';
 
     /*write command to client*/
     int n = write(clientSoc, new_command, size);
@@ -1290,19 +1332,21 @@ void parseRead(char *buffer, int clientSoc)
     {
         //figure out the command
         int strcount = 0;
-        while(buffer[strcount]!=':'){
+        while (buffer[strcount] != ':')
+        {
             strcount++;
         }
-        char* command = (char*)malloc(strcount+1*sizeof(char));
+        char *command = (char *)malloc(strcount + 1 * sizeof(char));
         check_malloc_null(command);
         int i = 0;
-        while(i < strcount){
+        while (i < strcount)
+        {
             command[i] = buffer[i];
             i++;
         }
         command[strcount] = '\0';
 
-        if (strcmp(command, "create")==0 || strcmp(command, "checkout")==0)
+        if (strcmp(command, "create") == 0 || strcmp(command, "checkout") == 0)
         {
             createProject(buffer, clientSoc);
         }
@@ -1331,14 +1375,14 @@ void parseRead(char *buffer, int clientSoc)
         else if (strcmp(command, "currentversion") == 0)
         {
             char *current_version = get_current_version(buffer, clientSoc, 'N');
-            char* format_str = (char*)malloc(digits(strlen(current_version))+1+strlen(current_version)*sizeof(char));
+            char *format_str = (char *)malloc(digits(strlen(current_version)) + 1 + strlen(current_version) * sizeof(char));
             format_str[0] = '\0';
-            char* intToStr = to_Str(strlen(current_version));
+            char *intToStr = to_Str(strlen(current_version));
             strcat(format_str, intToStr);
             strcat(format_str, ":");
             strcat(format_str, current_version);
             block_write(clientSoc, format_str, strlen(format_str));
-            
+
             free(format_str);
             free(intToStr);
         }
@@ -1362,7 +1406,8 @@ char *block_read(int fd, int targetBytes)
     memset(buffer, '\0', targetBytes + 1);
     int status = 0;
     int readIn = 0;
-    if(targetBytes==0)return NULL;
+    if (targetBytes == 0)
+        return NULL;
     do
     {
         status = read(fd, buffer + readIn, targetBytes - readIn);
@@ -1401,7 +1446,8 @@ int read_len_message(int fd)
     } while (buffer[readIn - 1] != ':' && status > 0);
     char num[20];
     int i = 0;
-    while(i < strlen(buffer)){
+    while (i < strlen(buffer))
+    {
         num[i] = buffer[i];
         i++;
     }
@@ -1410,14 +1456,17 @@ int read_len_message(int fd)
     return len;
 }
 
-void clean_up_code() {
+void clean_up_code()
+{
     printf("Clean up your code before exiting.\n");
     exit(0);
 }
 
 /*Handing SIGINT*/
-void sig_handler(int signo){
-    if(signo == SIGINT){
+void sig_handler(int signo)
+{
+    if (signo == SIGINT)
+    {
         printf("received SIGINT\n");
         atexit(clean_up_code);
         exit(0);
@@ -1427,25 +1476,27 @@ void sig_handler(int signo){
 void *mainThread(void *arg)
 {
     int clientSock = *((int *)arg);
-        
+
     /* Code to infinite read from server and disconnect when client sends DONE*/
     while (1)
     {
         int len = read_len_message(clientSock);
         char *buffer = block_read(clientSock, len);
-        if(buffer == NULL) continue;
+        if (buffer == NULL)
+            continue;
         if (strcmp(buffer, "Done") == 0)
         {
             printf("Client Disconnected\n");
             free(buffer);
             break;
         }
-        else if(strcmp(buffer, "Successfully connected to client.\n")==0){
+        else if (strcmp(buffer, "Successfully connected to client.\n") == 0)
+        {
             printf("%s\n", buffer);
             block_write(clientSock, "34:Successfully connected to server.\n", 37);
-            
         }
-        else{
+        else
+        {
             parseRead(buffer, clientSock);
         }
         free(buffer);
@@ -1482,47 +1533,52 @@ void set_up_connection(char *port)
     /*Initialize the mutex array structure*/
     int num_of_projects = find_all_projects();
     array_of_mutexes_size = num_of_projects;
-    char** projectNames = get_project_names(num_of_projects);
+    char **projectNames = get_project_names(num_of_projects);
     //array_of_mutexes = (MutexArray*)(num_of_projects*sizeof(MutexArray));
     int i = 0;
-    while(i < num_of_projects){
-        MutexArray* new_mutex_element = (MutexArray*)malloc(sizeof(MutexArray));
+    while (i < num_of_projects)
+    {
+        MutexArray *new_mutex_element = (MutexArray *)malloc(sizeof(MutexArray));
         new_mutex_element->projectName = projectNames[i];
         pthread_mutex_init(&(new_mutex_element->mutex), NULL);
         array_of_mutexes[i] = new_mutex_element;
         i++;
     }
-        
+
     /*For every client that connects - throw it into a new thread*/
-    pthread_t tid[10];  
-    i = 0; 
+    pthread_t tid[10];
+    i = 0;
     while (1)
     {
         /*Handing SIGINT*/
-        if(signal(SIGINT, sig_handler) == SIG_ERR){
+        if (signal(SIGINT, sig_handler) == SIG_ERR)
+        {
             printf("ERROR cannot catch SIGINT.\n");
         }
 
         /* Accept Client Connection = Blocking command */
         int clilen = sizeof(cli_addr);
         clientSoc = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
-        if (clientSoc < 0){
+        if (clientSoc < 0)
+        {
             printf("ERROR on accept\n");
         }
-        else{
+        else
+        {
             int error = pthread_create(&tid[i], NULL, mainThread, &clientSoc);
-            if(error < 0){
+            if (error < 0)
+            {
                 printf("ERROR unable to create thread.\n");
             }
             //pthread_detach(tid[i]);
             i++;
-            
         }
     }
 
     /*Join all the threads*/
     int j = 0;
-    while(j < i){
+    while (j < i)
+    {
         pthread_join(tid[i], NULL);
     }
 
@@ -1534,7 +1590,6 @@ void set_up_connection(char *port)
     //     free(array_of_mutexes[i]);
     //     i++;
     // }
-    
 }
 
 /* This method disconnects from client if necessary in the future*/
