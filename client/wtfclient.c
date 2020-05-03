@@ -251,7 +251,7 @@ char *write_commit_file(int sockfd, char *project_name, char *server_record_data
         {
             write(commit_fd, " ", 1);
             write(commit_fd, file_name, strlen(file_name));
-            printf("[CLIENT] %s\n", file_name);
+            printf("%s\n", file_name);
             write(commit_fd, " ", 1);
             write(commit_fd, live_hash_arr[i], strlen(live_hash_arr[i]));
             write(commit_fd, "\n", 1);
@@ -279,7 +279,7 @@ char *write_commit_file(int sockfd, char *project_name, char *server_record_data
                     printf("[CLIENT] %s ", "D ");
                     write(commit_fd, " ", 1);
                     write(commit_fd, file_name, strlen(file_name));
-                    printf("[CLIENT] %s\n", file_name);
+                    printf("%s\n", file_name);
                     write(commit_fd, " ", 1);
                     write(commit_fd, server_manifest[i]->hash, strlen(server_manifest[i]->hash));
                     write(commit_fd, "\n", 1);
@@ -292,7 +292,7 @@ char *write_commit_file(int sockfd, char *project_name, char *server_record_data
                 printf("[CLIENT] %s ", "D ");
                 write(commit_fd, " ", 1);
                 write(commit_fd, file_name, strlen(file_name));
-                printf("[CLIENT] %s\n", file_name);
+                printf("%s\n", file_name);
                 write(commit_fd, " ", 1);
                 write(commit_fd, server_manifest[i]->hash, strlen(server_manifest[i]->hash));
                 write(commit_fd, "\n", 1);
