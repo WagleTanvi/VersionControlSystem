@@ -1,55 +1,54 @@
 #include "header-files/helper.h"
 #include "header-files/record.h"
 
-
-// Returns hostname for the local computer 
-void checkHostName(int hostname) 
-{ 
-    if (hostname == -1) 
-    { 
-        perror("gethostname"); 
-    } 
+// Returns hostname for the local computer
+void checkHostName(int hostname)
+{
+    if (hostname == -1)
+    {
+        perror("gethostname");
+    }
 }
 
-// Returns host information corresponding to host name 
-void checkHostEntry(struct hostent * hostentry) 
-{ 
-    if (hostentry == NULL) 
-    { 
-        perror("gethostbyname"); 
-    } 
-} 
-  
-// Converts space-delimited IPv4 addresses 
-// to dotted-decimal format 
-void checkIPbuffer(char *IPbuffer) 
-{ 
-    if (NULL == IPbuffer) 
-    { 
-        perror("inet_ntoa"); 
-    } 
-} 
-  
-/*Returns the IP address of a machine!*/ 
-char* get_host_name()
-{ 
-    char hostbuffer[256]; 
-    char *IPbuffer; 
-    struct hostent *host_entry; 
-    int hostname; 
-  
-    // To retrieve hostname 
-    hostname = gethostname(hostbuffer, sizeof(hostbuffer)); 
-    checkHostName(hostname); 
+// Returns host information corresponding to host name
+void checkHostEntry(struct hostent *hostentry)
+{
+    if (hostentry == NULL)
+    {
+        perror("gethostbyname");
+    }
+}
 
-    // To retrieve host information 
-    host_entry = gethostbyname(hostbuffer); 
-    checkHostEntry(host_entry); 
-  
-    // To convert an Internet network address into ASCII string 
-    IPbuffer = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0])); 
-  
-    return IPbuffer; 
+// Converts space-delimited IPv4 addresses
+// to dotted-decimal format
+void checkIPbuffer(char *IPbuffer)
+{
+    if (NULL == IPbuffer)
+    {
+        perror("inet_ntoa");
+    }
+}
+
+/*Returns the IP address of a machine!*/
+char *get_host_name()
+{
+    char hostbuffer[256];
+    char *IPbuffer;
+    struct hostent *host_entry;
+    int hostname;
+
+    // To retrieve hostname
+    hostname = gethostname(hostbuffer, sizeof(hostbuffer));
+    checkHostName(hostname);
+
+    // To retrieve host information
+    host_entry = gethostbyname(hostbuffer);
+    checkHostEntry(host_entry);
+
+    // To convert an Internet network address into ASCII string
+    IPbuffer = inet_ntoa(*((struct in_addr *)host_entry->h_addr_list[0]));
+
+    return IPbuffer;
 }
 
 void syncManifests(char *project_name, char *buffer)
@@ -475,7 +474,7 @@ void upgrade(char *projectName, int sockfd)
         Record **serverRecords = create_record_struct(serverContent, true);
         Record **manifestClient = create_record_struct(fileData, true);
         int adds = find_number_of_adds(updateRecords);
-        printf("[CLIENT] Number of Adds %d\n", adds);
+        //printf("[CLIENT] Number of Adds %d\n", adds);
         Record **addRecords = (Record **)malloc(sizeof(Record *) * adds);
         int countAdd = 0;
         //printAllRecords(updateRecords);
@@ -565,7 +564,7 @@ void upgrade(char *projectName, int sockfd)
             }
             x++;
         }
-        printf("[CLIENT] Add Count %d\n", countAdd);
+        //printf("[CLIENT] Add Count %d\n", countAdd);
         //printAllRecords(manifestClient);
         int fd = open(manifestFilePath, O_WRONLY | O_TRUNC);
         if (fd == -1)
@@ -594,7 +593,8 @@ void upgrade(char *projectName, int sockfd)
         unlink(tempServerFilePath);
         free(updateFilePath);
         free(conflictFilePath);
-        printAllRecords(updateRecords);
+        printf("[CLIENT] Successfully Upgraded!\n");
+        //printAllRecords(updateRecords);
         //freeRecord(updateRecords, 'u', getRecordStructSize(updateRecords));
         freeRecord(manifestClient, 'm', getRecordStructSize(manifestClient));
         freeRecord(serverRecords, 'm', getRecordStructSize(serverRecords));
@@ -957,9 +957,13 @@ void get_history_file(char *projectName, int sockfd)
     if (newContent == NULL)
     {
         return;
-    } else if(strcmp(newContent, "")==0){
+    }
+    else if (strcmp(newContent, "") == 0)
+    {
         printf("History file is empty.\n");
-    } else {
+    }
+    else
+    {
         printf("History for %s:\n%s\n", projectName, newContent);
     }
     printf("[CLIENT] History for %s:\n%s\n", projectName, newContent);
@@ -1161,24 +1165,25 @@ int main(int argc, char **argv)
 
         /*first check if the project already exists on the client*/
         Boolean found_proj = searchForProject(argv[2]);
-        if(found_proj == true){
-            printf("ERROR the project already exists on the client!\n");
+        if (found_proj == true)
+        {
+            printf("[CLIENT] ERROR the project already exists on the client!\n");
             /*disconnect server at the end!*/
             block_write(sockfd, "4:Done", 6);
-            printf("\nClient Disconnecting.\n");
+            printf("[CLIENT] Client Disconnecting.\n");
             close(sockfd);
             return;
         }
 
-        write_to_server(sockfd, argv[1], argv[2], argv[2]);        
+        write_to_server(sockfd, argv[1], argv[2], argv[2]);
 
         char *buffer = read_from_server(sockfd);
         if (strstr(buffer, "ERROR") == NULL)
         {
             parseBuffer_create(buffer);
-            if(strcmp(argv[1], "create") == 0)
+            if (strcmp(argv[1], "create") == 0)
                 printf("[CLIENT] Successfully created project!\n");
-            else if(strcmp(argv[1], "checkout") == 0)
+            else if (strcmp(argv[1], "checkout") == 0)
                 printf("[CLIENT] Successfully checked out project!\n");
         }
         else
@@ -1187,7 +1192,7 @@ int main(int argc, char **argv)
         }
         /*disconnect server at the end!*/
         block_write(sockfd, "4:Done", 6);
-        printf("[CLIENT]  Client Disconnecting.\n");
+        printf("[CLIENT] Client Disconnecting.\n");
         close(sockfd);
     }
     else if (argc == 3 && (strcmp(argv[1], "destroy") == 0))
@@ -1199,7 +1204,7 @@ int main(int argc, char **argv)
 
         /*disconnect server at the end!*/
         block_write(sockfd, "4:Done", 6);
-        printf("[CLIENT]  Client Disconnecting.\n");
+        printf("[CLIENT] Client Disconnecting.\n");
         close(sockfd);
     }
     else if (argc == 4 && (strcmp(argv[1], "add") == 0 || strcmp(argv[1], "remove") == 0))
@@ -1256,7 +1261,7 @@ int main(int argc, char **argv)
         update(argv[2], sockfd);
 
         block_write(sockfd, "4:Done", 6);
-        printf("[CLIENT]  Client Disconnecting\n");
+        printf("[CLIENT] Client Disconnecting\n");
         close(sockfd);
     }
     else if (argc == 3 && (strcmp(argv[1], "upgrade") == 0))
@@ -1278,7 +1283,8 @@ int main(int argc, char **argv)
         char *s = write_commit_file(sockfd, argv[2], buffer);
 
         /*if the commit  had no changes then just stop there - or if there was an error*/
-        if(strcmp(s, "error") == 0){
+        if (strcmp(s, "error") == 0)
+        {
             /*disconnect*/
             block_write(sockfd, "4:Done", 6);
             printf("\nClient Disconnecting\n");
@@ -1299,10 +1305,10 @@ int main(int argc, char **argv)
             close(sockfd);
         }
         char *length_of_commit = to_Str(strlen(commit_file_content));
-        char* hostname = get_host_name();
-        char* hostname_len = to_Str(strlen(hostname));
+        char *hostname = get_host_name();
+        char *hostname_len = to_Str(strlen(hostname));
 
-        char *send_commit_to_server = (char *)malloc(strlen(argv[2]) + 1+ strlen(hostname_len) + 1 + strlen(hostname) + 1+ strlen(length_of_commit) + 1 + strlen(commit_file_content) * sizeof(char));
+        char *send_commit_to_server = (char *)malloc(strlen(argv[2]) + 1 + strlen(hostname_len) + 1 + strlen(hostname) + 1 + strlen(length_of_commit) + 1 + strlen(commit_file_content) * sizeof(char));
         send_commit_to_server[0] = '\0';
         strcat(send_commit_to_server, argv[2]);
         strcat(send_commit_to_server, ":");
@@ -1326,8 +1332,8 @@ int main(int argc, char **argv)
     else if (argc == 3 && (strcmp(argv[1], "push") == 0))
     {
         /*Get client hostname*/
-        char* hostname = get_host_name();
-        char* hostname_len = to_Str(strlen(hostname));  
+        char *hostname = get_host_name();
+        char *hostname_len = to_Str(strlen(hostname));
 
         /*Get the data from the commit file*/
         sockfd = read_configure_and_connect();

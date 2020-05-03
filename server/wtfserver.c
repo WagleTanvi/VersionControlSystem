@@ -277,19 +277,23 @@ void rollback(char *buffer, int clientSoc)
     /*Renaming doesn't work for some reason >__<*/
     count = 0;
     Boolean not_used_name = false;
-    char* old_name = NULL;
-    while(not_used_name != true){
-        char* number = to_Str(count);
-        char* old_name = (char*)malloc(strlen(project_name)+strlen("-old-")+strlen(number)*sizeof(char));
+    char *old_name = NULL;
+    while (not_used_name != true)
+    {
+        char *number = to_Str(count);
+        char *old_name = (char *)malloc(strlen(project_name) + strlen("-old-") + strlen(number) * sizeof(char));
         old_name[0] = '\0';
         strcat(old_name, project_name);
         strcat(old_name, "-old");
         strcat(old_name, number);
         DIR *dir = opendir(old_name);
-        if (dir == NULL){
+        if (dir == NULL)
+        {
             not_used_name = true;
             int r = rename(project_name, old_name);
-        } else {
+        }
+        else
+        {
             free(number);
             free(old_name);
         }
@@ -395,7 +399,7 @@ void push_commits(char *buffer, int clientSoc)
     bcount += strlen(plens) + 1;
     int pleni = atoi(plens);
     char *project_name = getSubstring(bcount, buffer, pleni);
-    bcount += (strlen(project_name) +1);
+    bcount += (strlen(project_name) + 1);
 
     /*mutex stuff*/
     pthread_mutex_t m = find_mutex(project_name);
@@ -417,16 +421,17 @@ void push_commits(char *buffer, int clientSoc)
     {
         count++;
     }
-    int nlen = count-bcount;
+    int nlen = count - bcount;
     char *size_of_hostname = getSubstring(bcount, buffer, nlen);
     bcount += (strlen(size_of_hostname) + 1);
     char *hostname = getSubstring(bcount, buffer, atoi(size_of_hostname));
-    bcount += (strlen(hostname)+1);
+    bcount += (strlen(hostname) + 1);
     free(size_of_hostname);
 
     /*Get the commit file data*/
     count = bcount;
-    while (buffer[count] != ':'){
+    while (buffer[count] != ':')
+    {
         count++;
     }
     nlen = count - bcount;
@@ -845,7 +850,7 @@ void create_commit_file(char *buffer, int clientSoc)
     char *size_of_hostname = getSubstring(bcount, buffer, count - bcount);
     bcount += (strlen(size_of_hostname) + 1);
     char *hostname = getSubstring(bcount, buffer, atoi(size_of_hostname));
-    bcount += (strlen(hostname)+1);
+    bcount += (strlen(hostname) + 1);
 
     /*make commit file*/
     printf("[SERVER] %s\n", hostname);
@@ -1296,7 +1301,7 @@ void createProject(char *buffer, int clientSoc)
         write(manifestFile, "0\n", 2);
         free(pserver);
 
-        char *pserver2 = (char *)malloc(strlen(project_name) + strlen("/.History")+1);
+        char *pserver2 = (char *)malloc(strlen(project_name) + strlen("/.History") + 1);
         check_malloc_null(pserver2);
         pserver2[0] = '\0';
         strcat(pserver2, project_name);
@@ -1335,8 +1340,8 @@ void createProject(char *buffer, int clientSoc)
     }
 
     /*add the length of the full commmand to the front of the protocol*/
-    int size = digits(strlen(command))+1+strlen(command)+2;
-    char *new_command = (char *)malloc(size*sizeof(char));
+    int size = digits(strlen(command)) + 1 + strlen(command) + 2;
+    char *new_command = (char *)malloc(size * sizeof(char));
     new_command[0] = '\0';
     char *slen = to_Str(strlen(command));
     strcat(new_command, slen);

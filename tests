@@ -1,9 +1,10 @@
 cd server
-./WTFServer 9008 &
-echo '=============================================='
-echo 'RUNNING SEQUENCE 2'
 rm -rf proj0
+./WTFServer 8000 &
 cd ../client
+echo 'Running Configure proj0'
+./WTF configure java.cs.rutgers.edu 8000
+echo 'RUNNING SEQUENCE 2'
 rm -rf proj0
 echo '=============================================='
 echo 'Running update proj0'
@@ -33,8 +34,37 @@ echo 'Expected output: Add file.txt'
 ./WTF commit proj0
 echo '=============================================='
 echo 'Running push proj0'
-echo 'Expected output: No commits for push'
+echo 'Expected output: Success'
 ./WTF push proj0
+echo '=============================================='
+echo 'Contents of file1.txt on server should be: test'
+cat ../server/proj0/file.txt
+echo '=============================================='
+echo 'Running update proj0'
+echo 'Expected output: No updates'
+./WTF update proj0
+echo '=============================================='
+echo 'Running upgrade proj0'
+echo 'Expected output: Up to date'
+./WTF upgrade proj0
+echo '=============================================='
+echo 'Running rollback proj0 0'
+echo 'Expected output: Success'
+./WTF rollback proj0 0
+echo '=============================================='
+echo 'file1.txt should not exist'
+cat ../server/proj0/file.txt
+echo '=============================================='
+echo 'Running update proj0'
+echo 'Expected output: Delete file.txt'
+./WTF update proj0
+echo '=============================================='
+echo 'Running upgrade proj0'
+echo 'Expected output: success'
+./WTF upgrade proj0
+echo '=============================================='
+echo 'file1.txt should not exist in manifest'
+cat proj0/.Manifest
 echo '=============================================='
 echo 'Killing Server Proccess'
 pkill WTFServer
