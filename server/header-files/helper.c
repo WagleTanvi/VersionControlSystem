@@ -233,23 +233,23 @@ char *fetch_file_from_client(char *fileName, int clientSoc)
 }
 
 /* tar extra credit */
-void tarFile(char *file)
+void tarFile(char *file, char* dir)
 {
-    char *command = malloc(sizeof(char) + 1 + 13 + 2 * strlen(file));
+    char *command = malloc(sizeof(char)*  1 + 13 + 2 + strlen(file));
     strcpy(command, "tar -cf ");
     strcat(command, file);
     strcat(command, ".tar ");
-    strcat(command, file);
+    strcat(command, dir);
     //printf("%s\n", command);
     system(command);
 }
 void untarFile(char *file)
 {
-    char *command = malloc(sizeof(char) + 1 + 13 + 2 * strlen(file));
+    char *command = malloc(sizeof(char) * 1 + 13 + 2 + strlen("./history/")+ strlen(file));
     strcpy(command, "tar -xf ");
+    // strcat(command, "./history/");
     strcat(command, file);
     strcat(command, ".tar ");
-    strcat(command, file);
-    //printf("%s\n", command);
+    printf("%s\n", command);
     system(command);
 }

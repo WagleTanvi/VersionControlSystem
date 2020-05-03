@@ -31,6 +31,27 @@ char *extract_path(char *path)
     return temp;
 }
 
+Boolean search_tars(char *tar)
+{
+    char path[4096];
+    struct dirent *d;
+    DIR *dir = opendir("./history");
+    if (dir == NULL)
+    {
+        return false;
+    }
+    while ((d = readdir(dir)) != NULL)
+    {
+        if (strcmp(d->d_name, tar) == 0)
+        {
+            closedir(dir);
+            return true;
+        }
+    }
+    closedir(dir);
+    return false;
+}
+
 /*Returns all the projects in the CWD*/
 int find_all_projects(){
     char path[4096];
@@ -221,93 +242,108 @@ void rollback(char *buffer, int clientSoc)
     int req_version = atoi(getSubstring(bcount, buffer, nlen));
 
     /*Traverse history folder - if the version number is greater then the requested then delete that version*/
-    char *history_dir = (char *)malloc(strlen(project_name) + strlen("/history\0") * sizeof(char));
-    history_dir[0] = '\0';
-    strcat(history_dir, project_name);
-    strcat(history_dir, "/history\0");
-    char *new_project_name = (char *)malloc(strlen(project_name) + 5 * sizeof(char));
-    Boolean found = false;
-    char path[4096];
-    struct dirent *d;
-    DIR *dir = opendir(history_dir);
-    if (dir == NULL)
-    {
-        block_write(clientSoc, "72:ERROR could not find any previous versions. Choose a different version.\n", 75);
-        return;
-    }
-    while ((d = readdir(dir)) != NULL)
-    {
-        snprintf(path, 4096, "%s/%s", history_dir, d->d_name);
-        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0 || strcmp(d->d_name, "history") == 0 || strcmp(d->d_name, "pending-commits") == 0)
-            continue;
-        if (d->d_type == DT_DIR)
-        {
-            char *req_dir = (char *)malloc(strlen(project_name) + 1 + strlen("history") + 1 + strlen(d->d_name));
-            req_dir[0] = '\0';
-            strcat(req_dir, project_name);
-            strcat(req_dir, "/history/");
-            strcat(req_dir, d->d_name);
-            char *format_str = current_version_format(req_dir);
-            int version_num = atoi(get_current_version(format_str, clientSoc, 'H'));
-            if (version_num == req_version)
-            {
-                found = true;
-                strcpy(new_project_name, d->d_name); //new_project_name = ivyproject-1
-                break;
-            }
-            free(req_dir);
-            free(format_str);
-        }
-    }
-    closedir(dir);
-    if (found == false)
-    {
-        block_write(clientSoc, "29:ERROR version was not found.\n", 32);
-        return;
+    char *tar_name = (char *)malloc(strlen(project_name) + digits(req_version)+ strlen(".tar")+1 * sizeof(char));
+    tar_name[0] = '\0';
+    strcat(tar_name, project_name);
+    strcat(tar_name, "-");
+    strcat(tar_name, to_Str(req_version));
+    strcat(tar_name, ".tar");
+    Boolean found = search_tars(tar_name);
+
+    if(found == false){
+        block_write(clientSoc, "58:ERROR could not find version. Choose a different version.\n", 61);
+        return;    
     }
 
-    /*Destory the current proejct and move this project outside the history folder and rename it*/
-    char *project_path = (char *)malloc(strlen(project_name) + strlen("/history/") + strlen(new_project_name) * sizeof(char)); //ivyproject/history/ivyproject-1
-    project_path[0] = '\0';
-    strcat(project_path, project_name);
-    strcat(project_path, "/history/\0");
-    strcat(project_path, new_project_name);
-    duplicate_dir(project_path, new_project_name, 0, req_version);
+    char *tar_name_2 = (char *)malloc(strlen(project_name) + digits(req_version)+ strlen(".tar")+1 * sizeof(char));
+    tar_name_2[0] = '\0';
+    strcat(tar_name_2, project_name);
+    strcat(tar_name_2, "-");
+    strcat(tar_name_2, to_Str(req_version));
+    untarFile(tar_name_2);    
+
+    // Boolean found = false;
+    // char path[4096];
+    // struct dirent *d;
+    // DIR *dir = opendir("./history");
+    // if (dir == NULL)
+    // {
+    //     block_write(clientSoc, "72:ERROR could not find any previous versions. Choose a different version.\n", 75);
+    //     return;
+    // }
+    // while ((d = readdir(dir)) != NULL)
+    // {
+    //     snprintf(path, 4096, "%s/%s", "./history", d->d_name);
+    //     if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0 || strcmp(d->d_name, "history") == 0 || strcmp(d->d_name, "pending-commits") == 0)
+    //         continue;
+    //     if (d->d_type == DT_DIR)
+    //     {
+    //         char *req_dir = (char *)malloc(strlen(project_name) + 1 + strlen("history") + 1 + strlen(d->d_name));
+    //         req_dir[0] = '\0';
+    //         strcat(req_dir, project_name);
+    //         strcat(req_dir, "/history/");
+    //         strcat(req_dir, d->d_name);
+    //         char *format_str = current_version_format(req_dir);
+    //         int version_num = atoi(get_current_version(format_str, clientSoc, 'H'));
+    //         if (version_num == req_version)
+    //         {
+    //             found = true;
+    //             strcpy(new_project_name, d->d_name); //new_project_name = ivyproject-1
+    //             break;
+    //         }
+    //         free(req_dir);
+    //         free(format_str);
+    //     }
+    // }
+    // closedir(dir);
+    // if (found == false)
+    // {
+    //     block_write(clientSoc, "29:ERROR version was not found.\n", 32);
+    //     return;
+    // }
+
+    // /*Destory the current proejct and move this project outside the history folder and rename it*/
+    // char *project_path = (char *)malloc(strlen(project_name) + strlen("/history/") + strlen(new_project_name) * sizeof(char)); //ivyproject/history/ivyproject-1
+    // project_path[0] = '\0';
+    // strcat(project_path, project_name);
+    // strcat(project_path, "/history/\0");
+    // strcat(project_path, new_project_name);
+    // duplicate_dir(project_path, new_project_name, 0, req_version);
+
+    /*Untar the requested version*/
 
     /*Renaming doesn't work for some reason >__<*/
-    count = 0;
-    Boolean not_used_name = false;
-    char *old_name = NULL;
-    while (not_used_name != true)
-    {
-        char *number = to_Str(count);
-        char *old_name = (char *)malloc(strlen(project_name) + strlen("-old-") + strlen(number) * sizeof(char));
-        old_name[0] = '\0';
-        strcat(old_name, project_name);
-        strcat(old_name, "-old");
-        strcat(old_name, number);
-        DIR *dir = opendir(old_name);
-        if (dir == NULL)
-        {
-            not_used_name = true;
-            int r = rename(project_name, old_name);
-        }
-        else
-        {
-            free(number);
-            free(old_name);
-        }
-        count++;
-    }
+    // int count = 0;
+    // Boolean not_used_name = false;
+    // char *old_name = NULL;
+    // while (not_used_name != true)
+    // {
+    //     char *number = to_Str(count);
+    //     if(number == "") number = "0";
+    //     char *old_name = (char *)malloc(strlen(project_name) + strlen("-old-") + strlen(number) * sizeof(char));
+    //     old_name[0] = '\0';
+    //     strcat(old_name, project_name);
+    //     strcat(old_name, "-old");
+    //     strcat(old_name, number);
+    //     DIR *dir = opendir(old_name);
+    //     if (dir == NULL)
+    //     {
+    //         not_used_name = true;
+    //         int r = rename(project_name, old_name);
+    //     }
+    //     else
+    //     {
+    //         free(number);
+    //         free(old_name);
+    //     }
+    //     count++;
+    // }
 
-    int r = rename(new_project_name, project_name);
+    // int r = rename(new_project_name, project_name);
 
     /*Send a success to the client.*/
     block_write(clientSoc, "37:Server has successfully rolled back.\n", 40);
 
-    /*free stuff*/
-    free(history_dir);
-    free(project_path);
 }
 
 //=============================== PUSH ======================
@@ -387,6 +423,8 @@ void expire_pending_commits(char *project_name, char *good_commit)
     }
     closedir(dir);
 }
+
+
 
 //push:23:projectname:234:blahblahcommintcontent
 void push_commits(char *buffer, int clientSoc)
@@ -526,34 +564,39 @@ void push_commits(char *buffer, int clientSoc)
     //  free(file_content2);
 
     /*make a history folder to store all the old commits*/
-    char *history_dir = (char *)malloc(strlen(project_name) + strlen("/history\0") * sizeof(char));
-    history_dir[0] = '\0';
-    strcat(history_dir, project_name);
-    strcat(history_dir, "/history\0");
-    mkdir_recursive(history_dir);
-    int ch = chmod(history_dir, 0775);
-    if (ch < 0)
-        printf("[SERVER] ERROR set permission error.\n");
-    // free(history_dir);
+    mkdir("history", 0775);
 
-    /*move old project to the history folder*/
-    char *new_project_name = (char *)malloc(strlen(project_name) + 3 * sizeof(char));
-    int project_version = atoi(server_manifest[0]->version);
-    char *v_len = to_Str(project_version);
-    new_project_name[0] = '\0';
-    strcat(new_project_name, project_name);
-    strcat(new_project_name, "-");
-    strcat(new_project_name, v_len);
-
-    char *new_project_path = (char *)malloc(strlen(project_name) + strlen(new_project_name) + strlen("history/") * sizeof(char));
-    new_project_path[0] = '\0';
-    strcat(new_project_path, project_name);
-    strcat(new_project_path, "/history/");
-    strcat(new_project_path, new_project_name);
-    duplicate_dir(project_name, new_project_path, 0, project_version);
-    // free(v_len);
-    // free(new_project_name);
-    // free(new_project_path);
+    /*tar this current version of the project*/
+    count = 0;
+    Boolean not_used_name = false;
+    char *tar_name = NULL;
+    while (not_used_name != true)
+    {
+        char *number = to_Str(count);
+        if(strcmp(number, "") == 0) number = "0\0";
+        char *tar_name = (char *)malloc(strlen(project_name) + strlen(number)+ strlen(".tar")+1 * sizeof(char));
+        tar_name[0] = '\0';
+        strcat(tar_name, project_name);
+        strcat(tar_name, "-");
+        strcat(tar_name, number);
+        strcat(tar_name, ".tar");
+        Boolean found = search_tars(tar_name);
+        if(found == false){
+            char *tar_name_2 = (char *)malloc(strlen("history/")+strlen(project_name) + strlen(number)+1* sizeof(char));
+            tar_name_2[0] = '\0';
+            strcat(tar_name_2, "history/");
+            strcat(tar_name_2, project_name);
+            strcat(tar_name_2, "-");
+            strcat(tar_name_2, number);
+            tarFile(tar_name_2, project_name);
+            not_used_name = true;
+        }
+        else {
+            // free(number);
+            // free(tar_name);
+        }
+        count++;
+    }
 
     /*do the stuff that is in the commit-modify the manifest too*/
     Record **active_commit = create_record_struct(file_content, 0, 'C');

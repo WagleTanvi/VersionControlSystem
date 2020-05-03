@@ -143,6 +143,6 @@ int read_len_message(int fd);
 /* This method disconnects from client if necessary in the future*/
 void disconnectServer(int fd);
 
-void tarFile(char *file);
+void tarFile(char *file, char* dir);
 void untarFile(char *file);
 #endif
