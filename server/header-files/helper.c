@@ -15,9 +15,10 @@ int digits(int n)
 }
 
 /*Returns a string converted number*/
-char* to_Str(int number){
-    char* num_str = (char*)malloc(digits(number)+1*sizeof(char));
-    snprintf(num_str, digits(number)+1, "%d", number);
+char *to_Str(int number)
+{
+    char *num_str = (char *)malloc(digits(number) + 1 * sizeof(char));
+    snprintf(num_str, digits(number) + 1, "%d", number);
     num_str[digits(number)] = '\0';
     return num_str;
 }
@@ -34,9 +35,10 @@ void check_malloc_null(void *data)
 }
 
 /*Get substring of a string*/
-char* getSubstring(int bcount, char* buffer, int nlen){
-    char* substr = (char*)malloc(nlen+1*sizeof(char));
-    check_malloc_null(substr);    
+char *getSubstring(int bcount, char *buffer, int nlen)
+{
+    char *substr = (char *)malloc(nlen + 1 * sizeof(char));
+    check_malloc_null(substr);
     int count = 0;
     while (count < nlen)
     {
@@ -154,78 +156,100 @@ int number_of_lines(char *fileData)
     return count;
 }
 
-// // Returns hostname for the local computer 
-// void checkHostName(int hostname) 
-// { 
-//     if (hostname == -1) 
-//     { 
-//         perror("gethostname"); 
-//     } 
+// // Returns hostname for the local computer
+// void checkHostName(int hostname)
+// {
+//     if (hostname == -1)
+//     {
+//         perror("gethostname");
+//     }
 // }
 
-// // Returns host information corresponding to host name 
-// void checkHostEntry(struct hostent * hostentry) 
-// { 
-//     if (hostentry == NULL) 
-//     { 
-//         perror("gethostbyname"); 
-//     } 
-// } 
-  
-// // Converts space-delimited IPv4 addresses 
-// // to dotted-decimal format 
-// void checkIPbuffer(char *IPbuffer) 
-// { 
-//     if (NULL == IPbuffer) 
-//     { 
-//         perror("inet_ntoa"); 
-//     } 
-// } 
-  
-// /*Returns the IP address of a machine!*/ 
-// char* get_host_name()
-// { 
-//     char hostbuffer[256]; 
-//     char *IPbuffer; 
-//     struct hostent *host_entry; 
-//     int hostname; 
-  
-//     // To retrieve hostname 
-//     hostname = gethostname(hostbuffer, sizeof(hostbuffer)); 
-//     checkHostName(hostname); 
+// // Returns host information corresponding to host name
+// void checkHostEntry(struct hostent * hostentry)
+// {
+//     if (hostentry == NULL)
+//     {
+//         perror("gethostbyname");
+//     }
+// }
 
-//     // To retrieve host information 
-//     host_entry = gethostbyname(hostbuffer); 
-//     checkHostEntry(host_entry); 
-  
-//     // To convert an Internet network address into ASCII string 
-//     IPbuffer = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0])); 
-  
-//     return IPbuffer; 
-// } 
+// // Converts space-delimited IPv4 addresses
+// // to dotted-decimal format
+// void checkIPbuffer(char *IPbuffer)
+// {
+//     if (NULL == IPbuffer)
+//     {
+//         perror("inet_ntoa");
+//     }
+// }
+
+// /*Returns the IP address of a machine!*/
+// char* get_host_name()
+// {
+//     char hostbuffer[256];
+//     char *IPbuffer;
+//     struct hostent *host_entry;
+//     int hostname;
+
+//     // To retrieve hostname
+//     hostname = gethostname(hostbuffer, sizeof(hostbuffer));
+//     checkHostName(hostname);
+
+//     // To retrieve host information
+//     host_entry = gethostbyname(hostbuffer);
+//     checkHostEntry(host_entry);
+
+//     // To convert an Internet network address into ASCII string
+//     IPbuffer = inet_ntoa(*((struct in_addr*)host_entry->h_addr_list[0]));
+
+//     return IPbuffer;
+// }
 
 char *fetch_file_from_client(char *fileName, int clientSoc)
 {
-    char* cmd = (char*)malloc(strlen("sendfile")+1+digits(strlen(fileName))+1+strlen(fileName)*sizeof(char));
+    char *cmd = (char *)malloc(strlen("sendfile") + 1 + digits(strlen(fileName)) + 1 + strlen(fileName) * sizeof(char));
     cmd[0] = '\0';
     strcat(cmd, "sendfile");
     strcat(cmd, ":");
     strcat(cmd, to_Str(strlen(fileName)));
     strcat(cmd, ":");
     strcat(cmd, fileName);
-    char* ext_cmd = (char*)malloc(digits(strlen(cmd))+1*sizeof(char));
+    char *ext_cmd = (char *)malloc(digits(strlen(cmd)) + 1 * sizeof(char));
     ext_cmd[0] = '\0';
     strcat(ext_cmd, to_Str(strlen(cmd)));
     strcat(ext_cmd, ":");
     strcat(ext_cmd, cmd);
-    
+
     block_write(clientSoc, ext_cmd, strlen(ext_cmd));
     int messageLen = read_len_message(clientSoc);
-    char* clientData = block_read(clientSoc, messageLen);
+    char *clientData = block_read(clientSoc, messageLen);
     if (strstr(clientData, "ERROR") != NULL) // check if errored (project name does not exist on server)
     {
         printf("%s", clientData);
         return NULL;
     }
     return clientData;
+}
+
+/* tar extra credit */
+void tarFile(char *file)
+{
+    char *command = malloc(sizeof(char) + 1 + 13 + 2 * strlen(file));
+    strcpy(command, "tar -cf ");
+    strcat(command, file);
+    strcat(command, ".tar ");
+    strcat(command, file);
+    //printf("%s\n", command);
+    system(command);
+}
+void untarFile(char *file)
+{
+    char *command = malloc(sizeof(char) + 1 + 13 + 2 * strlen(file));
+    strcpy(command, "tar -xf ");
+    strcat(command, file);
+    strcat(command, ".tar ");
+    strcat(command, file);
+    //printf("%s\n", command);
+    system(command);
 }

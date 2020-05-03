@@ -5,7 +5,6 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
 int test1(int fd)
 {
     write(fd, "rm -rf proj0\n", 13);
@@ -180,5 +179,5 @@ int main(int argc, char **argv)
     {
         waitpid(pid, 0, 0);
     }
-    // unlink("tests");
+    unlink("tests");
 }
