@@ -8,3 +8,8 @@ server/t
 server/.nfs*
 client/.nfs*
 WTFTest
+client/proj0
+client/proj1
+client/project1
+client/project2
+server/proj0-old
