@@ -906,6 +906,23 @@ void get_history_file(char *projectName, int sockfd)
     }
     //printf("[CLIENT] History for %s:\n%s\n", projectName, newContent);
 }
+
+void get_current_version(char* project_name, char* buffer){
+    Record** server_manifest= create_record_struct(buffer, true);
+    int size = getRecordStructSize(server_manifest);
+    printf("[CLIENT] Current version for %s:\n", project_name);
+    printf("[CLIENT] Project version: %s\n", server_manifest[0]->version);
+    if(size == 1){
+        printf("[CLIENT] There are no files in the server.\n");
+        return;
+    }
+    int i = 1;
+    while(i < size){
+        printf("[CLIENT] %s ", server_manifest[i]->version);
+        printf("%s\n", server_manifest[i]->file);
+    }
+}
+
 //=========================== SOCKET/CONFIGURE METHODS==================================================================
 /* delay function - DOESNT really WORK*/
 void delay(int number_of_seconds)
@@ -1375,9 +1392,12 @@ int main(int argc, char **argv)
     else if (argc == 3 && (strcmp(argv[1], "currentversion") == 0))
     {
         sockfd = read_configure_and_connect();
-        write_to_server(sockfd, "currentversion", argv[2], argv[2]);
+        write_to_server(sockfd, "manifest", argv[2], argv[2]);
         char *buffer = read_from_server(sockfd);
-        printf("[CLIENT] %s\n", buffer);
+        get_current_version(argv[2], buffer); 
+        // write_to_server(sockfd, "currentversion", argv[2], argv[2]);
+        // char *buffer = read_from_server(sockfd);
+        // printf("[CLIENT] %s\n", buffer);
 
         /*disconnect*/
         block_write(sockfd, "4:Done", 6);
