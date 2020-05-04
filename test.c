@@ -185,5 +185,5 @@ int main(int argc, char **argv)
     {
         waitpid(pid, 0, 0);
     }
-    unlink("tests");
+    //unlink("tests");
 }

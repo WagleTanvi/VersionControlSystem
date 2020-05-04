@@ -1,0 +1,46 @@
+cd server
+rm -rf proj0
+./WTFServer 9052 &
+cd ../client
+echo 'Running Configure proj0'
+./WTF configure ilab2.cs.rutgers.edu 9052
+rm -rf proj0
+echo 'RUNNING SEQUENCE 1'
+echo '=============================================='
+./WTF create proj0
+echo '=============================================='
+echo 'Running Create proj0'
+echo 'Expected output: Success'
+./WTF create proj0
+echo '=============================================='
+echo 'Running checkout proj0'
+echo 'Expected output: Proj already exists'
+./WTF checkout proj0
+echo '=============================================='
+echo 'Running currentversion proj0'
+echo 'Expected output: 0'
+./WTF currentversion proj0
+echo '=============================================='
+echo 'Running update proj0'
+echo 'Expected output: No updates'
+./WTF update proj0
+echo '=============================================='
+echo 'Running upgrade proj0'
+echo 'Expected output: Up to date'
+./WTF upgrade proj0
+echo '=============================================='
+echo 'Running commit proj0'
+echo 'Expected output: No commit changes'
+./WTF commit proj0
+echo '=============================================='
+echo 'Running push proj0'
+echo 'Expected output: No commits for push'
+./WTF push proj0
+echo '=============================================='
+echo 'Running rollback proj0'
+echo 'Expected output: No previous version'
+./WTF rollback proj0 2
+echo '=============================================='
+echo 'Killing Server Proccess'
+pkill WTFServer
+echo 'Tests Completed'

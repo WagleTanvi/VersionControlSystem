@@ -26,6 +26,12 @@ typedef struct Record
     unsigned char *hash;
 } Record;
 
+/*Create a struct that holds the project name and the mutex. Basically a hashmap that links project name with a mutex.*/
+typedef struct MutexArray{
+    char* projectName;
+    pthread_mutex_t mutex;
+} MutexArray;
+
 typedef enum Boolean
 {
     true = 1,
@@ -45,14 +51,8 @@ void check_malloc_null(void *data);
 /*Get substring of a string*/
 char *getSubstring(int bcount, char *buffer, int nlen);
 
-/*Returns the command - create/checkout/etc...*/
-char *getCommand(char *buffer);
-
 /*Makes directory and all subdirectories*/
 void mkdir_recursive(const char *path);
-
-/*Returns swtiches the name from server to client*/
-char *change_to_client(char *str);
 
 /*Return string of file content*/
 char *getFileContent(char *file, char *flag);
@@ -63,21 +63,40 @@ Boolean search_proj_exists(char *project_name);
 /* Returns number of lines in file */
 int number_of_lines(char *fileData);
 
-// Returns hostname for the local computer
-void checkHostName(int hostname);
-
-// Returns host information corresponding to host name
-void checkHostEntry(struct hostent *hostentry);
-
-// Converts space-delimited IPv4 addresses
-// to dotted-decimal format
-void checkIPbuffer(char *IPbuffer);
-
-// Driver code
-char *get_host_name();
-
 /*Returns the contents from the file requested from the client*/
 char *fetch_file_from_client(char *fileName, int clientSoc);
+
+/* tar extra credit */
+void tarFile(char *file, char* dir);
+
+void untarFile(char *file);
+
+Boolean search_tars(char *tar);
+
+char *extract_path(char *path);
+
+/*Returns all the projects in the CWD*/
+int find_all_projects();
+
+/*Returns the corresponding mutex to the project name*/
+pthread_mutex_t find_mutex(char* pname);
+
+/*Returns a string to send to current version*/
+char *current_version_format(char *req_dir);
+
+int get_version_from_tar(char* project_name, char* tar_name);
+
+void remove_new_versions(char* project_name, int req_version);
+
+/*Given a project name, duplicate the directory*/
+void duplicate_dir(char *project_path, const char *new_project_path, int history, int version);
+
+/*Returns the names of all the  projects in the CWD as a string array*/
+char** get_project_names(int size);
+
+//=============================== HISTORY ======================
+/*Saves each the commits made in each push to a log called .History*/
+void save_history(char *commitData, char *projectName, char *version);
 
 //=============================== CURRENT VERSION ======================
 /*Returns the current version of a project as a string*/
@@ -88,8 +107,8 @@ char *get_current_version(char *buffer, int clientSoc, char flag);
 void rollback(char *buffer, int clientSoc);
 
 //=============================== PUSH ======================
-/*Given a project name, duplicate the directory*/
-void duplicate_dir(char* project_path, const char* new_project_path, int h, int v);
+/*On fail, remove any pending commits.*/
+void expire_pending_commits(char *project_name, char *good_commit);
 
 //push:23:projectname:234:blahblahcommintcontent
 void push_commits(char *buffer, int clientSoc);
@@ -143,6 +162,4 @@ int read_len_message(int fd);
 /* This method disconnects from client if necessary in the future*/
 void disconnectServer(int fd);
 
-void tarFile(char *file, char* dir);
-void untarFile(char *file);
 #endif

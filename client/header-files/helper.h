@@ -62,7 +62,19 @@ char* read_file(char* file);
 
 void fetchFile(char *buffer, int sockfd);
 
-void increment_manifest_version(char* project_name, int sockfd);
+void checkHostName(int hostname);
+
+// Returns host information corresponding to host name
+void checkHostEntry(struct hostent *hostentry);
+
+// Converts space-delimited IPv4 addresses
+// to dotted-decimal format
+void checkIPbuffer(char *IPbuffer);
+
+/*Returns the IP address of a machine!*/
+char *get_host_name();
+
+void syncManifests(char *project_name, char *buffer);
 
 //================================= FREE METHODS==================================================================
 /*Free 2d String array*/
@@ -108,6 +120,10 @@ Boolean remove_file_from_record(char *projectName, char *fileName, char *recordP
 //=================================================== CREATE ===============================================================
 /*Creates the project in the client folder*/
 void parseBuffer_create(char *buffer);
+
+//=================================================== HISTORY ===============================================================
+
+void get_history_file(char *projectName, int sockfd);
 
 //=========================== SOCKET/CONFIGURE METHODS==================================================================
 /* delay function - DOESNT really WORK*/
