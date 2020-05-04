@@ -338,6 +338,7 @@ void remove_new_versions(char* project_name, int req_version){
             }
         }
     }
+    closedir(dir);
 }
 
 /*Given a project name, duplicate the directory*/
@@ -378,6 +379,7 @@ void duplicate_dir(char *project_path, const char *new_project_path, int history
             }
             char *old_file_contents = getFileContent(path, "");
             write(dup_file, old_file_contents, strlen(old_file_contents));
+            close(dup_file);
         }
     }
     closedir(dir);
