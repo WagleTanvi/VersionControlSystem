@@ -14,3 +14,5 @@ client/project1
 client/project2
 server/proj0-old
 tests
+server/header-files/*.o
+client/header-files/*.o
