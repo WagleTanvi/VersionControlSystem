@@ -570,7 +570,7 @@ void create_commit_file(char *buffer, int clientSoc)
     bcount += (strlen(hostname) + 1);
 
     /*make commit file*/
-    printf("[SERVER] %s\n", hostname);
+    //printf("[SERVER] %s\n", hostname);
     char *pserver = (char *)malloc(strlen(project_name) + strlen(hostname) + strlen("/pending-commits/.Commit-"));
     pserver[0] = '\0';
     strcat(pserver, project_name);

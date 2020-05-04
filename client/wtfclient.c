@@ -920,6 +920,7 @@ void get_current_version(char* project_name, char* buffer){
     while(i < size){
         printf("[CLIENT] %s ", server_manifest[i]->version);
         printf("%s\n", server_manifest[i]->file);
+        i++;
     }
 }
 

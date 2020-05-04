@@ -191,7 +191,7 @@ void tarFile(char *file, char* dir)
     strcat(command, file);
     strcat(command, ".tar ");
     strcat(command, dir);
-    printf("%s\n", command);
+    //printf("%s\n", command);
     system(command);
     //tar -cf history/pojjname.tar proj0
 }
@@ -203,7 +203,7 @@ void untarFile(char *file)
     // strcat(command, "./history/");
     strcat(command, file);
     //strcat(command, " -C .");
-    printf("%s\n", command);
+    //printf("%s\n", command);
     system(command);
 }
 
