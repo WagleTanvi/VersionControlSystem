@@ -469,11 +469,7 @@ void push_commits(char *buffer, int clientSoc)
 
     /*mutex stuff*/
     pthread_mutex_t m = find_mutex(project_name);
-    int mu = pthread_mutex_trylock(&m);
-    printf("1:%d\n", mu);
-    pthread_mutex_unlock(&m);
-    mu = pthread_mutex_trylock(&m);
-    printf("2:%d\n", mu);
+    // pthread_mutex_unlock(&m);
     pthread_mutex_lock(&m);
 
     /*check if the project exists in the server*/
@@ -880,10 +876,6 @@ void push_commits(char *buffer, int clientSoc)
     // freeRecord(active_commit, 'u', active_commit_size);
 
     pthread_mutex_unlock(&m);
-    mu = pthread_mutex_trylock(&m);
-    printf("2:%d\n", mu);
-
-
 }
 
 //=============================== COMMIT ======================
@@ -1170,8 +1162,8 @@ void destroyProject(char *buffer, int clientSoc)
     char *project_name = getSubstring(bcount, buffer, pleni);
     int foundProj = search_proj_exists(project_name);
 
-    // pthread_mutex_t m = find_mutex(project_name);
-    // pthread_mutex_lock(&m);
+    pthread_mutex_t m = find_mutex(project_name);
+    pthread_mutex_lock(&m);
 
     /*Error checking*/
     if (foundProj == 0)
@@ -1200,8 +1192,10 @@ void destroyProject(char *buffer, int clientSoc)
     {
         block_write(clientSoc, "32:Successfully destroyed project.\n", 35);
     }
+
+    pthread_mutex_unlock(&m);
     return;
-    // pthread_mutex_unlock(&m);
+
 }
 
 //=============================== CHECKOUT ======================
@@ -1641,7 +1635,7 @@ void set_up_connection(char *port)
         exit(0);
     }
     /*listen on port*/
-    listen(sockfd, 10);
+    listen(sockfd, 30);
     printf("[SERVER] Server Listening\n");
 
     /*Initialize the mutex array structure*/
@@ -1663,7 +1657,7 @@ void set_up_connection(char *port)
     // }
 
     /*For every client that connects - throw it into a new thread*/
-    pthread_t tid[10];
+    pthread_t tid[30];
     i = 0;
     while (1)
     {
