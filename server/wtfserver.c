@@ -233,7 +233,6 @@ void push_commits(char *buffer, int clientSoc)
     strcat(pserver, "/pending-commits/.Commit-");
     strcat(pserver, hostname);
     char *server_file_content = getFileContent(pserver, "");
-    int num = number_of_lines(server_file_content);
 
     /*server commit file doesn't exist*/
     if (server_file_content == NULL)
@@ -259,6 +258,8 @@ void push_commits(char *buffer, int clientSoc)
         return;
     }
 
+    int num = number_of_lines(server_file_content);
+    
     /*Get the manifest file data*/
     count = bcount;
     while (buffer[count] != ':')
