@@ -2,117 +2,11 @@
 #include "header-files/record.h"
 
 /*Create a struct that holds the project name and the mutex. Basically a hashmap that links project name with a mutex.*/
-typedef struct MutexArray
-{
-    char *projectName;
-    pthread_mutex_t mutex;
-} MutexArray;
 
 int cmd_count = 0;
 
 MutexArray *array_of_mutexes[5];
 int array_of_mutexes_size = 5;
-
-void untarFile(char *file)
-{
-    char *command = malloc(sizeof(char) + 1 + 8 + strlen(file));
-    strcpy(command, "tar -xf ");
-    // strcat(command, "./history/");
-    strcat(command, file);
-    //strcat(command, " -C .");
-    printf("%s\n", command);
-    system(command);
-}
-
-char *extract_path(char *path)
-{
-    int size = strlen(path);
-    int x = size - 1;
-    while (x >= 0)
-    {
-        if (path[x] == '/')
-        {
-            break;
-        }
-        x--;
-    }
-    char *temp = (char *)malloc(sizeof(char) * x + 2);
-    strncpy(temp, path, x + 1);
-    temp[x + 1] = '\0';
-    //printf("[SERVER] %s\n", temp);
-    return temp;
-}
-
-Boolean search_tars(char *tar)
-{
-    char path[4096];
-    struct dirent *d;
-    DIR *dir = opendir("./history");
-    if (dir == NULL)
-    {
-        return false;
-    }
-    while ((d = readdir(dir)) != NULL)
-    {
-        if (strcmp(d->d_name, tar) == 0)
-        {
-            closedir(dir);
-            return true;
-        }
-    }
-    closedir(dir);
-    return false;
-}
-
-/*Returns all the projects in the CWD*/
-int find_all_projects()
-{
-    char path[4096];
-    int count = 0;
-    struct dirent *d;
-    DIR *dir = opendir("./");
-    if (dir == NULL)
-    {
-        return 0;
-    }
-    while ((d = readdir(dir)) != NULL)
-    {
-        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, "header-files") == 0)
-            continue;
-        if (d->d_type == DT_DIR)
-        {
-            count++;
-        }
-    }
-    closedir(dir);
-    return count;
-}
-
-/*Returns the names of all the  projects in the CWD as a string array*/
-char **get_project_names(int size)
-{
-    char path[4096];
-    char **project_names = (char **)malloc(size * sizeof(char *));
-    struct dirent *d;
-    DIR *dir = opendir("./");
-    if (dir == NULL)
-    {
-        return NULL;
-    }
-    int i = 0;
-    while ((d = readdir(dir)) != NULL)
-    {
-        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, "header-files") == 0)
-            continue;
-        if (d->d_type == DT_DIR)
-        {
-            project_names[i] = d->d_name;
-            i++;
-        }
-    }
-    closedir(dir);
-    return project_names;
-}
 
 /*Returns the corresponding mutex to the project name*/
 pthread_mutex_t find_mutex(char *pname)
@@ -218,62 +112,6 @@ char *get_current_version(char *buffer, int clientSoc, char flag)
 }
 
 //=============================== ROLLBACK ======================
-/*Returns a string to send to current version*/
-char *current_version_format(char *req_dir)
-{
-    char *len = to_Str(strlen(req_dir));
-    char *formatted = (char *)malloc(strlen("currentversion") + 1 + digits(strlen(req_dir)) + 1 + strlen(req_dir));
-    formatted[0] = '\0';
-    strcat(formatted, "currentversion:");
-    strcat(formatted, len);
-    strcat(formatted, ":");
-    strcat(formatted, req_dir);
-
-    free(len);
-    return formatted;
-}
-
-int get_version_from_tar(char *project_name, char *tar_name)
-{
-    int count = 0;
-    count += strlen(project_name);
-    count++;
-    char version[5];
-    int i = 0;
-    while (tar_name[count] != '.')
-    {
-        version[i] = tar_name[count];
-        count++;
-        i++;
-    }
-    int version_num = atoi(version);
-    return version_num;
-}
-
-void remove_new_versions(char *project_name, int req_version)
-{
-    /*remove the files in pending commits*/
-    char path[4096];
-    struct dirent *d;
-    DIR *dir = opendir("history");
-    if (dir == NULL)
-    {
-        printf("ERROR not a directory.\n");
-        return;
-    }
-    while ((d = readdir(dir)) != NULL)
-    {
-        snprintf(path, 4096, "%s/%s", "history", d->d_name);
-        if (d->d_type != DT_DIR)
-        {
-            int tar_version = get_version_from_tar(project_name, d->d_name);
-            if (tar_version >= req_version)
-            {
-                unlink(path);
-            }
-        }
-    }
-}
 
 //23:projectname:13
 void rollback(char *buffer, int clientSoc)
@@ -395,51 +233,6 @@ void rollback(char *buffer, int clientSoc)
 }
 
 //=============================== PUSH ======================
-
-/*Given a project name, duplicate the directory*/
-void duplicate_dir(char *project_path, const char *new_project_path, int history, int version)
-{
-    if (history > version)
-    {
-        return;
-    }
-    char path[4096];
-    char newpath[4096];
-    struct dirent *d;
-    DIR *dir = opendir(project_path);
-    if (dir == NULL)
-    {
-        printf("[SERVER] ERROR this is not a directory.\n");
-        return;
-    }
-    mkdir_recursive(new_project_path);
-    while ((d = readdir(dir)) != NULL)
-    {
-        snprintf(path, 4096, "%s/%s", project_path, d->d_name);
-        snprintf(newpath, 4096, "%s/%s", new_project_path, d->d_name);
-        if (strcmp(d->d_name, ".") == 0 || strcmp(d->d_name, "..") == 0 || strcmp(d->d_name, ".git") == 0 || strcmp(d->d_name, "pending-commits") == 0)
-            continue;
-        else if (strcmp(d->d_name, "history") == 0)
-        {
-            history++;
-        }
-        if (d->d_type == DT_DIR)
-        {
-            duplicate_dir(path, newpath, history, version);
-        }
-        else
-        {
-            int dup_file = open(newpath, O_WRONLY | O_CREAT | O_TRUNC, 0775);
-            if (dup_file < 0)
-            {
-                printf("[SERVER] ERROR unable to make new file: %s\n", strerror(errno));
-            }
-            char *old_file_contents = getFileContent(path, "");
-            write(dup_file, old_file_contents, strlen(old_file_contents));
-        }
-    }
-    closedir(dir);
-}
 
 void expire_pending_commits(char *project_name, char *good_commit)
 {

@@ -1,69 +1,7 @@
 #include "header-files/helper.h"
 #include "header-files/record.h"
 
-// Returns hostname for the local computer
-void checkHostName(int hostname)
-{
-    if (hostname == -1)
-    {
-        perror("gethostname");
-    }
-}
-
-// Returns host information corresponding to host name
-void checkHostEntry(struct hostent *hostentry)
-{
-    if (hostentry == NULL)
-    {
-        perror("gethostbyname");
-    }
-}
-
-// Converts space-delimited IPv4 addresses
-// to dotted-decimal format
-void checkIPbuffer(char *IPbuffer)
-{
-    if (NULL == IPbuffer)
-    {
-        perror("inet_ntoa");
-    }
-}
-
-/*Returns the IP address of a machine!*/
-char *get_host_name()
-{
-    char hostbuffer[256];
-    char *IPbuffer;
-    struct hostent *host_entry;
-    int hostname;
-
-    // To retrieve hostname
-    hostname = gethostname(hostbuffer, sizeof(hostbuffer));
-    checkHostName(hostname);
-
-    // To retrieve host information
-    host_entry = gethostbyname(hostbuffer);
-    checkHostEntry(host_entry);
-
-    // To convert an Internet network address into ASCII string
-    IPbuffer = inet_ntoa(*((struct in_addr *)host_entry->h_addr_list[0]));
-
-    return IPbuffer;
-}
-
-void syncManifests(char *project_name, char *buffer)
-{
-    char *manifest = (char *)malloc(strlen(project_name) + strlen("./Manifest") * sizeof(char));
-    manifest[0] = '\0';
-    strcat(manifest, project_name);
-    strcat(manifest, "/.Manifest");
-    int new_manifest_file = open(manifest, O_WRONLY | O_CREAT | O_TRUNC, 0775);
-    int w = write(new_manifest_file, buffer, strlen(buffer));
-    if (w < 0)
-        printf("[CLIENT] ERROR writing to the manifest.\n");
-}
-
-//========================HASHING===================================================
+//./fdsafasdfasfd========================HASHING===================================================
 unsigned char *getHash(char *s)
 {
     unsigned char *digest = SHA256(s, strlen(s), 0);
@@ -187,7 +125,7 @@ char *write_commit_file(int sockfd, char *project_name, char *server_record_data
     if (strcmp(commit_content, "") != 0)
     {
         /*This is probably not your first time commiting something*/
-        Record **commit_file_record = create_record_struct(commit_content, false);
+        commit_file_record = create_record_struct(commit_content, false);
     }
 
     /*go through each file in client manifest and compare manifests and write commit file*/
@@ -1250,7 +1188,7 @@ int main(int argc, char **argv)
         }
         else
         {
-            printf("[CLIENT] Project does not exist!");
+            printf("[CLIENT] Project does not exist!\n");
         }
         free(filePath);
     }
