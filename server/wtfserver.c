@@ -5,8 +5,9 @@
 
 int cmd_count = 0;
 
-MutexArray *array_of_mutexes[5];
-int array_of_mutexes_size = 5;
+MutexArray *array_of_mutexes[20];
+int project_count = 0;
+int array_of_mutexes_size = 20;
 
 /*Returns the corresponding mutex to the project name*/
 pthread_mutex_t find_mutex(char *pname)
@@ -14,6 +15,16 @@ pthread_mutex_t find_mutex(char *pname)
     int i = 0;
     while (i < array_of_mutexes_size)
     {
+        if (array_of_mutexes[i] == NULL)
+        {
+            i++;
+            continue;
+        }
+        else if (array_of_mutexes[i]->projectName == NULL)
+        {
+            i++;
+            continue;
+        }
         if (strcmp(array_of_mutexes[i]->projectName, pname) == 0)
         {
             return array_of_mutexes[i]->mutex;
@@ -280,10 +291,6 @@ void push_commits(char *buffer, int clientSoc)
     char *project_name = getSubstring(bcount, buffer, pleni);
     bcount += (strlen(project_name) + 1);
 
-    /*mutex stuff*/
-    pthread_mutex_t m = find_mutex(project_name);
-    pthread_mutex_lock(&m);
-
     /*check if the project exists in the server*/
     int foundProj = search_proj_exists(project_name);
     if (foundProj == 0)
@@ -293,6 +300,11 @@ void push_commits(char *buffer, int clientSoc)
         block_write(clientSoc, "33:ERROR project not in the server.\n", 36);
         return;
     }
+
+    /*mutex stuff*/
+    pthread_mutex_t m = find_mutex(project_name);
+    // pthread_mutex_unlock(&m);
+    pthread_mutex_lock(&m);
 
     /*get client host name - to find commit file*/
     int count = bcount;
@@ -977,9 +989,6 @@ void destroyProject(char *buffer, int clientSoc)
     char *project_name = getSubstring(bcount, buffer, pleni);
     int foundProj = search_proj_exists(project_name);
 
-    pthread_mutex_t m = find_mutex(project_name);
-    pthread_mutex_lock(&m);
-
     /*Error checking*/
     if (foundProj == 0)
     {
@@ -989,6 +998,9 @@ void destroyProject(char *buffer, int clientSoc)
             printf("[SERVER] ERROR writing to the client.\n");
         return;
     }
+
+    pthread_mutex_t m = find_mutex(project_name);
+    pthread_mutex_lock(&m);
 
     /*Call remove_directory*/
     char *pserver = (char *)malloc(strlen(project_name));
@@ -1162,6 +1174,10 @@ void createProject(char *buffer, int clientSoc)
             block_write(clientSoc, "34:ERROR the project already exists.\n", 37);
             return;
         }
+
+        /*Add this project name to the mutex Array*/
+        array_of_mutexes[project_count]->projectName = project_name;
+        project_count++;
 
         /*make project folder and set permissions*/
         char *pserver = (char *)malloc(strlen(project_name) + strlen("/.Manifest") + 1);
@@ -1454,23 +1470,19 @@ void set_up_connection(char *port)
     printf("[SERVER] Server Listening\n");
 
     /*Initialize the mutex array structure*/
-    int num_of_projects = find_all_projects();
-    array_of_mutexes_size = num_of_projects;
-    char **projectNames = get_project_names(num_of_projects);
+    // int num_of_projects = find_all_projects();
+    // array_of_mutexes_size = num_of_projects;
+    // char** projectNames = get_project_names(num_of_projects);
     //array_of_mutexes = (MutexArray*)(num_of_projects*sizeof(MutexArray));
     int i = 0;
-    while (i < num_of_projects)
+    while (i < 20)
     {
         MutexArray *new_mutex_element = (MutexArray *)malloc(sizeof(MutexArray));
-        new_mutex_element->projectName = projectNames[i];
+        new_mutex_element->projectName = NULL;
         pthread_mutex_init(&(new_mutex_element->mutex), NULL);
         array_of_mutexes[i] = new_mutex_element;
         i++;
     }
-
-    // if (pthread_mutex_init(&mutex, NULL) != 0) {
-    //     printf("\n mutex init has failed\n");
-    // }
 
     /*For every client that connects - throw it into a new thread*/
     pthread_t tid[10];
@@ -1508,13 +1520,15 @@ void set_up_connection(char *port)
     {
         pthread_join(tid[i], NULL);
     }
-    // pthread_mutex_destroy(&mutex);
 
     /*Free and destroy the mutex array structure*/
     i = 0;
-    while (i < num_of_projects)
+    while (i < 20)
     {
-        free(array_of_mutexes[i]->projectName);
+        if (array_of_mutexes[i]->projectName != NULL)
+        {
+            free(array_of_mutexes[i]->projectName);
+        }
         pthread_mutex_destroy(&(array_of_mutexes[i]->mutex));
         free(array_of_mutexes[i]);
         i++;
