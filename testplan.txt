@@ -1,0 +1,58 @@
+TEST PLAN
+Our testcases are outline in testcases.txt and the code required to run testcases is in test.c . 
+
+WTFTEST
+The make file has a WTFTest target in it which compiles test.c and builds executable ./WTFTest. This file goes through several (not all) testcases for the WTF project. There are two sequences that tester can choose from 1 or 2. Each sequence is a series of commands that rely on the previous result and test different functionality of the program. For each command, it will display both the Server and Client STDOUT which will be differentiated by [SERVER] and [CLIENT]. It will also display the command being run, expected output, and then the output of the command. The sequences for the testcases are outlined in testcases.txt. Test.c first starts the server, then runs a client command and lastly kills the server process.
+
+VERY IMPORTANT NOTE: In order for WTFTest to run correctly, Asst3 is in the machine’s home directory. Test.c has a specific running path of $HOME/Asst3
+	Test.c should have this path for example
+	/ilab/users/tnw39/Asst3/test.c
+
+HOW TO RUN:
+	make WTFTest
+	./WTFTest <host> <port> <sequence # [1 or 2]>
+	Example: ./WTFTest java.cs.rutgers.edu 8000
+	
+
+Example Asst3 Directory:
+Asst3
+     | --- Server
+	  | ---- proj0
+		 | ----- .Manifest
+		 | ----- file1.txt
+	  | ---- history
+		 | ----- proj0-0.tar
+	  | ---- WTFServer
+	  | ---- wtfserver.c
+	  | ---- header-files
+		 | ----- helper.h
+		 | ----- helper.c
+     | --- Client
+	  | ---- proj0
+		 | ----- .Manifest
+		 | ----- file1.txt
+	  | ---- WTF
+	  | ---- wtf.c
+	  | ---- header-files
+		 | ----- helper.h
+		 | ----- helper.c
+     | --- Makefile
+     | --- readme.pdf
+     | --- testcases.txt
+     | --- testplan.txt
+     | --- test.c
+     | --- WTFTest
+     
+Instructions to Run Server and Client
+In order to make all executables, 
+Run ‘make’ in the same directory as the Makefile.
+The server and client executables are made in the server and client folder respectively
+In order to start the server, 
+	cd server
+	run ‘WTFServer <port number>’
+In order to start a client,
+	cd client
+	run ‘WTF <command>’
+
+For full test cases and expected outputs, see testcases.txt.
+To read our documentation of our project, see readme.pdf
