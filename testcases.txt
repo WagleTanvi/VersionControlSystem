@@ -1,0 +1,282 @@
+The testcases outline below follow a sequence of interactions that are tested in sequentially in order to test the functionality of all the client commands.
+
+First, we tried "wrong argument testcases" which tested invlaid arguments for each command. 
+For example:
+    ./WTF configure 
+    ./WTF hello
+    ./WTF add proj0
+
+Next, we tested server and client connection cases. 
+We ran a client command without the server on and it reported connection attempts.
+We ran each command create, destroy, configure without a configure file and it gave an error as expected.
+
+Third, we ran sequence test for single client interactions.
+
+Sequence #1
+./WTF create proj0
+		success
+./WTF create proj0
+		give error: project already exists
+./WTF checkout proj0
+		give error: project already exists
+./WTF currentversion proj0
+		success (should be 0)
+./WTF update proj0
+		no changes
+./WTF upgrade proj0
+		no changes
+./WTF commit proj0
+		no changes
+./WTF push proj0
+		error no commit file
+./WTF rollback proj0 2
+		error-version doesn't exist
+./WTF history proj0
+		error no history
+./WTF destroy proj0
+        success
+./WTF destroy proj0
+        Error proj does not exist
+
+Sequence #2
+./WTF update proj0
+        Give error: proj does not exist on server
+./WTF upgrade proj0
+        Give error: proj does not exist on server
+./WTF create proj0
+        Success
+./WTF upgrade proj0
+        Give error: .Update file does not exist
+
+Client: touch proj0/file.txt ; echo test > proj0/file.txt
+ 
+./WTF add proj0 file.txt
+        success
+./WTF commit proj0
+        Output one add 
+./WTF push proj0
+        success
+
+Server: cat proj0/file.txt = test
+
+./WTF update proj0
+        No changes
+./WTF upgrade proj0
+        Up to date
+./WTF rollback proj0 0
+        Success 
+
+Server: cat proj0/.Manifest = version should be 0
+        Cat proj0/file.txt  does not exist 
+
+ ./WTF update proj0 
+        Output one delete
+./WTF upgrade proj0
+        success
+
+Client: cat proj0/.Manifest = version should be 0
+        Cat proj0/file.txt does not exist in manifest
+
+Sequence #3
+create in the server this project
+server
+  |-- proj1
+	|--subdir1
+	      |--subdir2
+		    |--file1.txt ("hello")
+	      |--file2.txt (empty)
+        |-- file3.txt ("fish")
+        |-- .Manifest (“0\n”)
+        |-- .History (empty)
+
+./WTF checkout proj1
+success
+./WTF add proj1 subdir1/subdir2/file1.txt
+./WTF add proj1 subdir1/file2.txt
+./WTF add proj1 file3.txt
+successfully added all the files
+./WTF commit proj1
+(should have 3 added files)
+./WTF push proj1
+success
+./WTF remove proj1 subdir1/subdir2/file1.txt
+success
+./WTF commit proj1
+(should have 1 deleted, 1 modified)
+./WTF push proj1
+success
+(the new directory should look like this)
+server
+  |-- proj1
+	|--subdir1
+	      |--subdir2
+	      |--file2.txt (empty)
+        |-- file3.txt ("fish")
+
+./WTF currentversion proj1
+2
+/WTF history proj1
+Should display recent modify of file3.txt
+Should display recent delete of file1.txt
+./WTF destroy proj1
+success
+
+Sequence #4
+./WTF remove proj1 file1.txt
+        Error : proj1 does not exist
+./WTF add proj1 file1.txt 
+        Error: proj1 does not exist 
+./WTF create proj1 [server not running]
+        Reconnection Attempt 
+        Run Server - Sucess
+./WTF add proj0 file.txt 
+        Error: Project does not exist
+./WTF add proj1 file1.txt 
+        Error: file does not exist
+
+touch proj1/file1.txt ; echo ‘yes’ > proj1/file1.txt
+
+./WTF add proj1 file1.txt
+        Success
+./WTF add proj1 file1.txt
+        Error: file exists in manifeset
+./WTF remove proj1 file2.txt
+        Error: file does not exist
+./WTF remove proj0 file1.txt 
+        Error: proj does not exist
+./WTF remove proj1 file1.txt 
+        Succcess
+./WTF commit proj1
+        success - there are no changes to be made - commit file should not exist
+./WTF push proj0
+        Error no commit file
+
+Lastly, we ran Multi Client interactions. These testcases require two clients.
+
+Sequence #5
+[CLIENT 0]--------------------------------------------------
+
+./WTF create proj0
+
+mkdir proj0/subdir1
+touch ./proj0/subdir1/file1.txt
+touch ./proj0/file2.txt
+touch ./proj0/file3.txt
+echo "hello" > proj0/file2.txt
+
+./WTF add proj0 subdir1/file1.txt
+        success
+./WTF add proj0 file2.txt
+        success
+./WTF commit proj0
+        success
+./WTF push proj0
+        success
+
+(server: subdir1-> file1.txt(empty), file2.txt (hello)) 
+
+./WTF currentversion proj0
+        1 
+
+[CLIENT 1]--------------------------------------------------
+./WTF checkout proj0
+        success
+
+(Client: no history or pending commits folder)
+
+./WTF remove proj0 subdir/file1.txt
+        success
+./WTF commit proj0
+        success, Delete file1.txt
+
+echo "hi" >> proj0/file2.txt (hello\nhi)
+
+./WTF commit proj0
+    Modify file2.txt
+./WTF push proj0
+    success
+(Server: no file1.txt and a file2.txt that says "hello\nhi")
+
+[CLIENT 0]--------------------------------------------------
+echo "something" >> proj0/subdir1/file1.txt
+
+./WTF commit proj0
+        error- need to update
+./WTF push proj0
+        error - no commit file
+./WTF update proj0
+        no conflict - file2.txt was modified, file1.txt was deleted  
+./WTF upgrade proj0
+        Success 
+
+Client = No file1.txt in manifest, file2.txt (hello\nhi) and file3.txt (which has not been added to the manifest)
+
+./WTF add proj0 file3.txt
+        success
+./WTF commit proj0
+        success
+./WTF push proj0
+        success
+
+Server = No file1.txt, file2.txt (hello\nhi), file3.txt (empty)
+./WTF currentversion proj0 
+        3
+./WTF rollback proj0 1
+        success
+Server = file1.txt (empty) , file2.txt (hello), no file3.txt
+./WTF currentversion proj0
+        1
+./WTF history proj0
+        Display 1 push (add two files)
+
+[CLIENT 1]--------------------------------------------------
+echo "fish" >> proj0/file2.txt
+./WTF commit proj0
+Fail
+./WTF update proj0
+conflict!
+echo "hello > proj0/file2.txt
+echo "hi" >> proj0/file2.txt
+./WTF update proj0
+success
+./WTF commit proj0
+- error - still has update file
+./WTF upgrade proj0
+success
+echo "blue fish" >> proj0/subdir/file1.txt
+./WTF commit proj0
+./WTF push proj0
+./WTF rollback proj0 1 
+
+Server = file1.txt (empty) , file2.txt (hello), no file3.txt
+
+
+Sequence #6
+[CLIENT 0]--------------------------------------------------
+./WTF create proj0
+        success
+
+touch proj0/file1.txt
+echo “TEST” > proj0/file1.txt
+
+./WTF add proj0 file1.txt
+        success
+./WTF commit proj0
+        success
+./WTF push proj0
+        success
+
+echo “0” >> proj0/file1.txt
+./WTF commit proj0
+        success
+
+[CLIENT 1]--------------------------------------------------
+./WTF checkout proj0
+        success
+echo “1” >> proj0/file1.txt
+./WTF commit proj0
+        success
+
+AT THE SAME TIME [test mutexes]
+    ./WTF push proj0
+        Only one should go through
