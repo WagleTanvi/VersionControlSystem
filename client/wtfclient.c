@@ -125,7 +125,7 @@ char *write_commit_file(int sockfd, char *project_name, char *server_record_data
     if (strcmp(commit_content, "") != 0)
     {
         /*This is probably not your first time commiting something*/
-        Record **commit_file_record = create_record_struct(commit_content, false);
+        commit_file_record = create_record_struct(commit_content, false);
     }
 
     /*go through each file in client manifest and compare manifests and write commit file*/
