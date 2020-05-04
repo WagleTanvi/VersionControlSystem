@@ -2,7 +2,6 @@ TEST PLAN
 Our testcases are outline in testcases.txt and the code required to run testcases is in test.c . 
 
 WTFTEST
-
 The make file has a WTFTest target in it which compiles test.c and builds executable ./WTFTest. This file goes through several (not all) testcases for the WTF project. There are two sequences that tester can choose from 1 or 2. Each sequence is a series of commands that rely on the previous result and test different functionality of the program. For each command, it will display both the Server and Client STDOUT which will be differentiated by [SERVER] and [CLIENT]. It will also display the command being run, expected output, and then the output of the command. The sequences for the testcases are outlined in testcases.txt. Test.c first starts the server, then runs a client command and lastly kills the server process.
 
 VERY IMPORTANT NOTE: In order for WTFTest to run correctly, Asst3 is in the machine’s home directory. Test.c has a specific running path of $HOME/Asst3
@@ -44,6 +43,7 @@ Asst3
      | --- test.c
      | --- WTFTest
      
+<<<<<<< HEAD
 Instructions to Run Server and Client:
     In order to make all executables, 
     Run ‘make’ in the same directory as the Makefile.
@@ -54,6 +54,18 @@ Instructions to Run Server and Client:
     In order to start a client,
         cd client
         run ‘WTF <command>’
+=======
+Instructions to Run Server and Client
+In order to make all executables, 
+Run ‘make’ in the same directory as the Makefile.
+The server and client executables are made in the server and client folder respectively
+In order to start the server, 
+	cd server
+	run ‘WTFServer <port number>’
+In order to start a client,
+	cd client
+	run ‘WTF <command>’
+>>>>>>> d848c2720aa08f1b4c0c74cf99d26ed3c2cb027d
 
 For full test cases and expected outputs, see testcases.txt.
 To read our documentation of our project, see readme.pdf
