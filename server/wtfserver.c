@@ -43,12 +43,14 @@ void save_history(char *commitData, char *projectName, char *version)
     int fd = open(filePath, O_WRONLY | O_CREAT | O_APPEND, 00600);
     if (fd == -1)
     {
+        close(fd);
         printf("[SERVER] Fatal Error: Could not open History file");
         return;
     }
     //write(fd, "Project version: ", strlen("Project version: "));
     // write(fd, version, strlen(version));
     write(fd, commitData, strlen(commitData));
+    close(fd);
     free(filePath);
 }
 
@@ -75,6 +77,7 @@ char *get_current_version(char *buffer, int clientSoc, char flag)
         {
             foundProj = 1;
         }
+        closedir(dir);
     }
     else
     {
@@ -100,6 +103,7 @@ char *get_current_version(char *buffer, int clientSoc, char flag)
         block_write(clientSoc, "37:ERROR failed to get current version.\n", 40);
         return;
     }
+    close(fd);
     char version_buf[50];
     bzero(version_buf, 50);
     int status = 0;
@@ -185,33 +189,34 @@ void rollback(char *buffer, int clientSoc)
     strcat(tar_name_2, req_version_str);
     strcat(tar_name_2, ".tar");
 
+    remove_directory(project_name);
     /*Renaming doesn't work for some reason >__<*/
-    count = 0;
-    Boolean not_used_name = false;
-    char *old_name = NULL;
-    while (not_used_name != true)
-    {
-        char *number = to_Str(count);
-        if (number == "")
-            number = "0";
-        char *old_name = (char *)malloc(strlen(project_name) + strlen("-old-") + strlen(number) * sizeof(char));
-        old_name[0] = '\0';
-        strcat(old_name, project_name);
-        strcat(old_name, "-old");
-        strcat(old_name, number);
-        DIR *dir = opendir(old_name);
-        if (dir == NULL)
-        {
-            not_used_name = true;
-            int r = rename(project_name, old_name);
-        }
-        else
-        {
-            free(number);
-            free(old_name);
-        }
-        count++;
-    }
+    // count = 0;
+    // Boolean not_used_name = false;
+    // char *old_name = NULL;
+    // while (not_used_name != true)
+    // {
+    //     char *number = to_Str(count);
+    //     if(number == "") number = "0";
+    //     char *old_name = (char *)malloc(strlen(project_name) + strlen("-old-") + strlen(number) * sizeof(char));
+    //     old_name[0] = '\0';
+    //     strcat(old_name, project_name);
+    //     strcat(old_name, "-old");
+    //     strcat(old_name, number);
+    //     DIR *dir = opendir(old_name);
+    //     if (dir == NULL)
+    //     {
+    //         not_used_name = true;
+    //         int r = rename(project_name, old_name);
+    //     }
+    //     else
+    //     {
+    //         free(number);
+    //         free(old_name);
+    //     }
+    //     closedir(dir);
+    //     count++;
+    // }
 
     untarFile(tar_name_2);
 
@@ -222,20 +227,23 @@ void rollback(char *buffer, int clientSoc)
     pend_commits_folder[0] = '\0';
     strcat(pend_commits_folder, project_name);
     strcat(pend_commits_folder, "/pending-commits");
-    DIR *dir = opendir(pend_commits_folder);
-    if (dir == NULL)
-    {
-        printf("ERROR not a directory.\n");
-        return;
-    }
-    while ((d = readdir(dir)) != NULL)
-    {
-        snprintf(path, 4096, "%s/%s", pend_commits_folder, d->d_name);
-        if (d->d_type != DT_DIR)
-        {
-            unlink(path);
-        }
-    }
+    remove_directory(pend_commits_folder);
+    // DIR *dir = opendir(pend_commits_folder);
+    // if (dir == NULL)
+    // {
+    //     printf("ERROR not a directory.\n");
+    //     return;
+    // }
+    // while ((d = readdir(dir)) != NULL)
+    // {
+    //     snprintf(path, 4096, "%s/%s", pend_commits_folder, d->d_name);
+    //     if (d->d_type != DT_DIR)
+    //     {
+    //         unlink(path);
+    //     }
+    // }
+    // rmdir(pend_commits_folder);
+    // closedir(dir);
 
     remove_new_versions(project_name, req_version);
 
@@ -509,6 +517,7 @@ void push_commits(char *buffer, int clientSoc)
             int fd = open(filepath, O_WRONLY | O_TRUNC);
             if (fd == -1)
             {
+                close(fd);
                 expire_pending_commits(project_name, "");
                 printf("[SERVER] Fatal Error: Could not open Update file");
                 // free(project_name);
@@ -527,6 +536,7 @@ void push_commits(char *buffer, int clientSoc)
             {
                 block_write(fd, newContent, strlen(newContent));
             }
+            close(fd);
         }
         else if (strcmp(active_commit[x]->version, "A") == 0)
         { //add file
@@ -549,6 +559,7 @@ void push_commits(char *buffer, int clientSoc)
             int new_file = open(filepath, O_WRONLY | O_CREAT | O_TRUNC, 0775);
             if (new_file < 0)
             {
+                close(new_file);
                 expire_pending_commits(project_name, "");
                 printf("[SERVER] ERROR unable to make new file: %s\n", strerror(errno));
                 // free(project_name);
@@ -563,6 +574,7 @@ void push_commits(char *buffer, int clientSoc)
                 block_write(clientSoc, "21:Push command failed 6!\n", 24);
                 return;
             }
+            close(new_file);
             /*add the new file to the manifest*/
             Record *manifest_rec = search_record(server_manifest, filepath);
             if (manifest_rec != NULL)
@@ -619,6 +631,7 @@ void push_commits(char *buffer, int clientSoc)
             int fd = open(filepath, O_WRONLY | O_CREAT | O_TRUNC, 00600);
             if (fd == -1)
             {
+                close(fd);
                 expire_pending_commits(project_name, "");
                 printf("[SERVER] Fatal Error: Could not open Update file");
                 block_write(clientSoc, "21:Push command failed 9!\n", 24);
@@ -628,6 +641,7 @@ void push_commits(char *buffer, int clientSoc)
             {
                 block_write(fd, newContent, strlen(newContent));
             }
+            close(fd);
         }
         else if (strcmp(active_commit[x]->version, "D") == 0)
         {
@@ -684,6 +698,7 @@ void push_commits(char *buffer, int clientSoc)
         }
         x++;
     }
+    close(new_manifest_file);
 
     /*delete the commit file*/
     int unl = unlink(pserver);
@@ -786,11 +801,8 @@ void create_commit_file(char *buffer, int clientSoc)
     file_content[atoi(size)] = '\0';
     write(commitFile, file_content, atoi(size));
 
-    // free(project_name);
-    // free(pending_commits);
-    // free(pserver);
-    // free(size);
-    // free(file_content);
+    close(commitFile);
+
     block_write(clientSoc, "48:Successfully created commit file in the server.\n", 51);
 }
 
@@ -1007,6 +1019,8 @@ void destroyProject(char *buffer, int clientSoc)
     pserver[0] = '\0';
     strcat(pserver, project_name);
 
+    // free(array_of_mutexes[project_count]->projectName);
+
     int r = remove_directory(pserver);
 
     free(project_name);
@@ -1176,7 +1190,9 @@ void createProject(char *buffer, int clientSoc)
         }
 
         /*Add this project name to the mutex Array*/
-        array_of_mutexes[project_count]->projectName = project_name;
+        char *proj_name_mutex = (char *)malloc(sizeof(char) * strlen(project_name));
+        strcpy(proj_name_mutex, project_name);
+        array_of_mutexes[project_count]->projectName = proj_name_mutex;
         project_count++;
 
         /*make project folder and set permissions*/
@@ -1201,6 +1217,7 @@ void createProject(char *buffer, int clientSoc)
             return;
         }
         write(manifestFile, "0\n", 2);
+        close(manifestFile);
         free(pserver);
 
         char *pserver2 = (char *)malloc(strlen(project_name) + strlen("/.History") + 1);
@@ -1209,12 +1226,12 @@ void createProject(char *buffer, int clientSoc)
         strcat(pserver2, project_name);
         strcat(pserver2, "/.History");
         int historyFile = open(pserver2, O_WRONLY | O_CREAT | O_TRUNC, 0775);
-        if (manifestFile < 0)
+        if (historyFile < 0)
         {
             block_write(clientSoc, "36:ERROR unable to make history file.\n", 39);
             return;
         }
-        free(pserver2);
+        close(historyFile);
     }
     else if (strcmp(cmd, "checkout") == 0)
     {
