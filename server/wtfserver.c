@@ -469,6 +469,11 @@ void push_commits(char *buffer, int clientSoc)
 
     /*mutex stuff*/
     pthread_mutex_t m = find_mutex(project_name);
+    int mu = pthread_mutex_trylock(&m);
+    printf("1:%d\n", mu);
+    pthread_mutex_unlock(&m);
+    mu = pthread_mutex_trylock(&m);
+    printf("2:%d\n", mu);
     pthread_mutex_lock(&m);
 
     /*check if the project exists in the server*/
@@ -875,6 +880,10 @@ void push_commits(char *buffer, int clientSoc)
     // freeRecord(active_commit, 'u', active_commit_size);
 
     pthread_mutex_unlock(&m);
+    mu = pthread_mutex_trylock(&m);
+    printf("2:%d\n", mu);
+
+
 }
 
 //=============================== COMMIT ======================
@@ -1161,16 +1170,14 @@ void destroyProject(char *buffer, int clientSoc)
     char *project_name = getSubstring(bcount, buffer, pleni);
     int foundProj = search_proj_exists(project_name);
 
-    pthread_mutex_t m = find_mutex(project_name);
-    pthread_mutex_lock(&m);
+    // pthread_mutex_t m = find_mutex(project_name);
+    // pthread_mutex_lock(&m);
 
     /*Error checking*/
     if (foundProj == 0)
     {
         free(project_name);
-        int n = write(clientSoc, "44:ERROR the project does not exist on server.\n", 47);
-        if (n < 0)
-            printf("[SERVER] ERROR writing to the client.\n");
+        block_write(clientSoc, "44:ERROR the project does not exist on server.\n", 47);
         return;
     }
 
@@ -1194,7 +1201,7 @@ void destroyProject(char *buffer, int clientSoc)
         block_write(clientSoc, "32:Successfully destroyed project.\n", 35);
     }
     return;
-    pthread_mutex_unlock(&m);
+    // pthread_mutex_unlock(&m);
 }
 
 //=============================== CHECKOUT ======================
