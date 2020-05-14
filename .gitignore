@@ -2,3 +2,17 @@ WTF
 WTFServer
 a.out
 .configure
+client/t
+server/t
+.nfs*
+server/.nfs*
+client/.nfs*
+WTFTest
+client/proj0
+client/proj1
+client/project1
+client/project2
+server/proj0-old
+tests
+server/header-files/*.o
+client/header-files/*.o
