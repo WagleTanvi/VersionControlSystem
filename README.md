@@ -15,20 +15,20 @@ wtfserver.c - a server that can connect with multiple clients at a time.
 
 
 ### Synopsis  
-./WTFServer <port number>
-./WTF configure <IP/hostname> <port number>
-./WTF create <project name>
-./WTF checkout <project name>
-./WTF add <project name> <file name>
-./WTF remove <project name> <file name>
-./WTF destroy <project name>
-./WTF update <project name>
-./WTF upgrade <project name>
-./WTF commit <project name>
-./WTF push <project name>
-./WTF rollback <project name> <version number>
-./WTF history <project name>
-./WTF currentversion <project name> <version number>
+```./WTFServer \<port number>```  
+```./WTF configure \<IP/hostname> <port number>```   
+```./WTF create \<project name>```   
+```./WTF checkout \<project name>```   
+```./WTF add \<project name> \<file name>```   
+```./WTF remove \<project name> \<file name>```  
+```./WTF destroy \<project name>```     
+```./WTF update \<project name>```     
+```./WTF upgrade \<project name>```   
+```./WTF commit \<project name>```    
+```./WTF push \<project name>```    
+```./WTF rollback \<project name> \<version number>```   
+```./WTF history \<project name>```     
+```./WTF currentversion \<project name> \<version number>```      
 
 ### Instructions to run Server and Client:  
 In order to make all executables run ‘make’ in the same directory as the Makefile. The server and client executables are made in the server and client folder respectively.  
@@ -206,5 +206,5 @@ Gets the current version of the project and versions of files by reading
 the first line of the manifest file. On success, prints the current
 version to STDOUT. Otherwise, prints an error.
 
-### WRITTEN BY
+## WRITTEN BY
 Tanvi Wagle (tnw39) and Ivy Wang (iw86)
